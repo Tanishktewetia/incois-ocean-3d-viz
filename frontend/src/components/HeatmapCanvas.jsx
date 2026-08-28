@@ -1,51 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { getOceanSlice } from "../api/client.js";
-
-const COLOR_STOPS = [
-  [0, 29, 108],
-  [0, 170, 220],
-  [255, 224, 92],
-  [205, 38, 38],
-];
-const LAND_COLOR = [12, 24, 32, 255];
-
-function interpolateColor(value, minimum, maximum) {
-  const normalized = maximum === minimum ? 0.5 : (value - minimum) / (maximum - minimum);
-  const position = Math.min(1, Math.max(0, normalized)) * (COLOR_STOPS.length - 1);
-  const lowerIndex = Math.min(Math.floor(position), COLOR_STOPS.length - 2);
-  const amount = position - lowerIndex;
-  const lower = COLOR_STOPS[lowerIndex];
-  const upper = COLOR_STOPS[lowerIndex + 1];
-
-  return lower.map((channel, index) =>
-    Math.round(channel + (upper[index] - channel) * amount),
-  );
-}
+import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
 
 function drawHeatmap(canvas, slice) {
   const width = slice.longitudes.length;
   const height = slice.latitudes.length;
-  const temperatures = slice.values.flat().filter((value) => value !== null);
-  const minimum = Math.min(...temperatures);
-  const maximum = Math.max(...temperatures);
+  const { minimum, maximum } = getFiniteRange([slice.values]);
 
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
   const image = context.createImageData(width, height);
-
-  for (let sourceRow = 0; sourceRow < height; sourceRow += 1) {
-    const targetRow = height - sourceRow - 1;
-
-    for (let column = 0; column < width; column += 1) {
-      const value = slice.values[sourceRow][column];
-      const color = value === null
-        ? LAND_COLOR
-        : [...interpolateColor(value, minimum, maximum), 255];
-      const pixel = (targetRow * width + column) * 4;
-      image.data.set(color, pixel);
-    }
-  }
+  image.data.set(createColorBuffer(slice.values, minimum, maximum, { flipRows: true }));
 
   context.putImageData(image, 0, 0);
   return { minimum, maximum };

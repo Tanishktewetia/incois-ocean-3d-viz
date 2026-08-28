@@ -75,3 +75,31 @@
   4. Open `http://localhost:5173` and confirm **Backend connected** appears above a flat **Surface temperature** heatmap.
   5. Confirm the map shows recognizable Indian Ocean land/ocean boundaries, cooler areas in blue/cyan, warmer areas in yellow/red, dark land cells, and metadata reading approximately `5.0–22.0°N, 68.0–90.0°E · 0.49 m · 24.71–32.07 °C · 2026-09-06`.
 - **Automated validation:** `npm run build --prefix frontend` completed successfully. Running Uvicorn and Vite together confirmed the page loads and Vite proxies both `/health` and the unchanged `/api/slice` endpoint, returning the expected 205×265 grid.
+
+## Phase 3 — 3D Depth Stack
+
+- **Status:** Complete
+- **Files changed:**
+  - `backend/routers/ocean.py`
+  - `backend/services/slicer.py`
+  - `frontend/package.json`
+  - `frontend/package-lock.json`
+  - `frontend/src/App.jsx`
+  - `frontend/src/api/client.js`
+  - `frontend/src/components/HeatmapCanvas.jsx`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/utils/colorScale.js`
+  - `PHASE_LOG.md`
+- **Implementation:** Added `GET /api/layers?variable=thetao`, which returns shared coordinates/time metadata and eight 205×265 temperature grids for requested depths 0, 50, 100, 200, 500, 1000, 1500, and 2000 m. Their nearest available model levels are approximately 0.49, 47.37, 92.33, 186.13, 541.09, 1062.44, 1452.25, and 1941.89 m. The React app renders these grids as eight geographically proportioned Three.js planes stacked by model depth inside a wireframe volume. OrbitControls provides drag rotation and wheel zoom. The renderer, controls, textures, materials, geometries, resize observer, and animation frame are cleaned up when the component unmounts.
+- **Colormap:** Moved the Phase 2 blue-to-cyan-to-yellow-to-red interpolation and dark missing-cell color into `frontend/src/utils/colorScale.js` and reused it in both views. The 3D textures use one finite temperature range across all eight layers so the cold deep layers remain visually comparable with the warm surface; the Phase 2 heatmap retains its per-slice range and north-up row flip.
+- **Deviations from the plan:** The architecture did not specify the number or exact selection of depth layers. The user selected the eight representative requested depths listed above, with nearest-level selection. `/api/layers` factors shared latitude, longitude, variable, unit, and time metadata out of individual layers to avoid repeating it eight times. Three.js `0.185.1` was added as the only new package. No depth/time slider or Phase 4+ behavior was implemented.
+- **Credentials/data access:** No new credentials or dataset access were required; Phase 3 reuses the gitignored Phase 1 Copernicus subset.
+- **Manual test:**
+  1. Ensure `backend/data/copernicus_thetao_india_20260831_20260906.nc` exists and install frontend dependencies with `npm install --prefix frontend`.
+  2. From the repository root, start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`.
+  3. In another terminal, start the frontend with `npm run dev --prefix frontend`.
+  4. Open `http://localhost:5173` and confirm **Backend connected** and the **3D temperature depth stack** appear.
+  5. Drag the scene to rotate it and use the mouse wheel to zoom. Confirm eight separated planes are visible inside the wireframe, land remains dark, and deeper planes are predominantly colder blue shades than the warm surface.
+  6. Confirm the metadata lists depths approximately `0, 47, 92, 186, 541, 1062, 1452, 1942 m`, a cross-layer range of approximately `2.24–32.07 °C`, and date `2026-09-06`. The Phase 2 surface heatmap should remain visible below the scene.
+  7. Optionally open `http://127.0.0.1:8000/api/layers?variable=thetao` and confirm HTTP 200 with eight layers, 205 latitudes, and 265 longitudes.
+- **Automated validation:** Python compilation and direct real-NetCDF service assertions passed, including strict JSON serialization, exact eight-layer depth selection, 205×265 grid dimensions, and unchanged `/api/slice` surface values. Layer means cool from approximately 29.10 °C at 0.49 m to 2.78 °C at 1941.89 m. `npm run build --prefix frontend` completed successfully with Three.js and OrbitControls. Live Uvicorn plus Vite validation confirmed proxied `/health`, `/api/layers`, and `/api/slice` responses, HTTP 400 for unsupported `/api/layers?variable=so`, and an HTTP 200 frontend entry page.

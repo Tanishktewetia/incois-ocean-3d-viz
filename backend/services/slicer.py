@@ -11,6 +11,7 @@ DATA_FILE = (
     / "copernicus_thetao_india_20260831_20260906.nc"
 )
 SUPPORTED_VARIABLES = {"thetao"}
+LAYER_DEPTHS = (0, 50, 100, 200, 500, 1000, 1500, 2000)
 
 
 class OceanDataUnavailableError(RuntimeError):
@@ -62,4 +63,42 @@ def request_slice(depth: float, variable: str) -> dict[str, Any]:
         "latitudes": data["latitude"].values.tolist(),
         "longitudes": data["longitude"].values.tolist(),
         "values": json_values,
+    }
+
+
+def request_layers(variable: str) -> dict[str, Any]:
+    """Return representative depth grids at the latest available model time."""
+    if variable not in SUPPORTED_VARIABLES:
+        raise ValueError(
+            f"Unsupported variable '{variable}'. Supported variables: thetao."
+        )
+
+    dataset = get_dataset()
+    if variable not in dataset:
+        raise OceanDataUnavailableError(
+            f"Variable '{variable}' is missing from the Copernicus subset."
+        )
+
+    layers = []
+    for requested_depth in LAYER_DEPTHS:
+        data = dataset[variable].sel(depth=requested_depth, method="nearest").isel(time=-1)
+        values = np.where(np.isfinite(data.values), data.values, None).tolist()
+        layers.append(
+            {
+                "requested_depth": requested_depth,
+                "depth": float(data["depth"].item()),
+                "values": values,
+            }
+        )
+
+    latest = dataset[variable].isel(time=-1)
+    selected_time = np.datetime_as_string(latest["time"].values, unit="s") + "Z"
+
+    return {
+        "variable": variable,
+        "unit": latest.attrs.get("units", ""),
+        "time": selected_time,
+        "latitudes": latest["latitude"].values.tolist(),
+        "longitudes": latest["longitude"].values.tolist(),
+        "layers": layers,
     }

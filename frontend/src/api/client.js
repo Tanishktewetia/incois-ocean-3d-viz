@@ -21,3 +21,14 @@ export async function getOceanSlice({ depth = 0, variable = "thetao", signal } =
 
   return response.json();
 }
+
+export async function getOceanLayers({ variable = "thetao", signal } = {}) {
+  const parameters = new URLSearchParams({ variable });
+  const response = await fetch(`/api/layers?${parameters}`, { signal });
+
+  if (!response.ok) {
+    throw new Error(`Ocean layers request failed with status ${response.status}`);
+  }
+
+  return response.json();
+}
