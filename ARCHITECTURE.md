@@ -4,6 +4,13 @@
 > Any AI coding agent working on this repo MUST read this file first, and
 > MUST NOT implement a phase that isn't the current target phase.
 
+keep pushing the project to github after every implementation.
+"git remote add origin https://github.com/Tanishktewetia/incois-ocean-3d-viz.git
+git branch -M main
+git push -u origin main"
+username-Tanishktewetia
+email-tanishktewetia@gmail.com
+
 ---
 
 ## 1. The Idea, End to End
