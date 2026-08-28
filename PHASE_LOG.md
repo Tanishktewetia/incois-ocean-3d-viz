@@ -55,3 +55,23 @@
   4. Open `http://127.0.0.1:8000/api/slice?depth=0&variable=thetao`.
   5. Confirm HTTP 200 and JSON containing `"variable":"thetao"`, `"unit":"degrees_C"`, `"requested_depth":0.0`, `"depth":0.49402499198913574`, `"time":"2026-09-06T00:00:00Z"`, 205 latitudes, 265 longitudes, and a 205×265 `values` matrix with realistic surface temperatures (approximately 24.71–32.07 °C in finite ocean cells).
 - **Automated validation:** Python compilation and direct service assertions passed against the real NetCDF subset. Live Uvicorn requests confirmed HTTP 200 for a valid slice, HTTP 400 for unsupported variable `so`, HTTP 422 for depth above 2000 m, strict JSON serialization, and the unchanged `/health` endpoint.
+
+## Phase 2 — Flat 2D Heatmap
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/src/App.jsx`
+  - `frontend/src/api/client.js`
+  - `frontend/src/components/HeatmapCanvas.jsx`
+  - `frontend/vite.config.js`
+  - `PHASE_LOG.md`
+- **Implementation:** The React app requests `GET /api/slice?depth=0&variable=thetao` and renders the returned 205×265 surface-temperature grid into an HTML canvas. Finite ocean temperatures use a blue-to-cyan-to-yellow-to-red scale derived from the slice range; missing land cells use a dark background. Latitude rows are flipped during drawing so north is at the top and east is to the right.
+- **Deviations from the plan:** Added an `/api` Vite development proxy so the frontend can reuse the Phase 1 endpoint through its own origin. The view also displays the geographic bounds, selected model depth, temperature range, and data date beneath the canvas. No backend changes, depth/time controls, formal colorbar legend, 3D rendering, or later-phase functionality were added.
+- **Credentials/data access:** No new credentials or dataset access were required; Phase 2 reuses the local Phase 1 subset through the existing API.
+- **Manual test:**
+  1. Ensure `backend/data/copernicus_thetao_india_20260831_20260906.nc` exists and frontend dependencies are installed with `npm install --prefix frontend`.
+  2. From the repository root, start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`.
+  3. In another terminal, start the frontend with `npm run dev --prefix frontend`.
+  4. Open `http://localhost:5173` and confirm **Backend connected** appears above a flat **Surface temperature** heatmap.
+  5. Confirm the map shows recognizable Indian Ocean land/ocean boundaries, cooler areas in blue/cyan, warmer areas in yellow/red, dark land cells, and metadata reading approximately `5.0–22.0°N, 68.0–90.0°E · 0.49 m · 24.71–32.07 °C · 2026-09-06`.
+- **Automated validation:** `npm run build --prefix frontend` completed successfully. Running Uvicorn and Vite together confirmed the page loads and Vite proxies both `/health` and the unchanged `/api/slice` endpoint, returning the expected 205×265 grid.
