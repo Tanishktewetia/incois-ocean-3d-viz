@@ -31,9 +31,9 @@ def get_slice(
 
 
 @router.get("/layers")
-def get_layers(variable: str = "thetao") -> dict[str, Any]:
+def get_layers(variable: str = "thetao", time: str | None = None) -> dict[str, Any]:
     try:
-        return request_layers(variable=variable)
+        return request_layers(variable=variable, time=time)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

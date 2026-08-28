@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { getOceanLayers } from "../api/client.js";
+import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
 
 const SCENE_HEIGHT = 560;
@@ -32,6 +33,7 @@ function createOceanScene(container, payload, range) {
   const maximumDepth = Math.max(...payload.layers.map((layer) => layer.depth));
   const textures = [];
   const materials = [];
+  const planes = [];
 
   payload.layers.forEach((layer) => {
     const pixels = createColorBuffer(
@@ -63,6 +65,7 @@ function createOceanScene(container, payload, range) {
     plane.position.z = STACK_HEIGHT / 2 - (layer.depth / maximumDepth) * STACK_HEIGHT;
     plane.renderOrder = payload.layers.length - payload.layers.indexOf(layer);
     scene.add(plane);
+    planes.push(plane);
   });
 
   const frame = new THREE.LineSegments(
@@ -92,24 +95,53 @@ function createOceanScene(container, payload, range) {
   }
   animate();
 
-  return () => {
-    cancelAnimationFrame(animationFrame);
-    resizeObserver.disconnect();
-    controls.dispose();
-    textures.forEach((texture) => texture.dispose());
-    materials.forEach((material) => material.dispose());
-    geometry.dispose();
-    frame.geometry.dispose();
-    frame.material.dispose();
-    renderer.dispose();
-    renderer.domElement.remove();
+  return {
+    updateLayers(nextPayload, nextRange) {
+      nextPayload.layers.forEach((layer, index) => {
+        const pixels = createColorBuffer(
+          layer.values,
+          nextRange.minimum,
+          nextRange.maximum,
+        );
+        textures[index].image.data.set(pixels);
+        textures[index].needsUpdate = true;
+      });
+    },
+    highlightDepth(selectedIndex) {
+      materials.forEach((material, index) => {
+        material.opacity = index === selectedIndex ? 0.96 : 0.28;
+        material.depthWrite = index === selectedIndex;
+        material.needsUpdate = true;
+      });
+      planes.forEach((plane, index) => {
+        plane.renderOrder = index === selectedIndex ? payload.layers.length + 1 : index;
+      });
+    },
+    dispose() {
+      cancelAnimationFrame(animationFrame);
+      resizeObserver.disconnect();
+      controls.dispose();
+      textures.forEach((texture) => texture.dispose());
+      materials.forEach((material) => material.dispose());
+      geometry.dispose();
+      frame.geometry.dispose();
+      frame.material.dispose();
+      renderer.dispose();
+      renderer.domElement.remove();
+    },
   };
 }
 
 function OceanScene3D() {
   const containerRef = useRef(null);
+  const sceneApiRef = useRef(null);
+  const payloadRef = useRef(null);
   const [payload, setPayload] = useState(null);
   const [range, setRange] = useState(null);
+  const [times, setTimes] = useState([]);
+  const [selectedDepthIndex, setSelectedDepthIndex] = useState(0);
+  const [selectedTimeIndex, setSelectedTimeIndex] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -117,8 +149,11 @@ function OceanScene3D() {
 
     getOceanLayers({ variable: "thetao", signal: controller.signal })
       .then((layersPayload) => {
+        payloadRef.current = layersPayload;
         setPayload(layersPayload);
         setRange(getFiniteRange(layersPayload.layers.map((layer) => layer.values)));
+        setTimes(layersPayload.times);
+        setSelectedTimeIndex(layersPayload.times.indexOf(layersPayload.time));
       })
       .catch((requestError) => {
         if (requestError.name !== "AbortError") {
@@ -131,11 +166,67 @@ function OceanScene3D() {
 
   useEffect(() => {
     if (!containerRef.current || !payload || !range) {
+      return;
+    }
+
+    if (!sceneApiRef.current) {
+      sceneApiRef.current = createOceanScene(containerRef.current, payload, range);
+      sceneApiRef.current.highlightDepth(selectedDepthIndex);
+    } else {
+      sceneApiRef.current.updateLayers(payload, range);
+    }
+  }, [payload, range]);
+
+  useEffect(() => () => {
+    sceneApiRef.current?.dispose();
+    sceneApiRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    sceneApiRef.current?.highlightDepth(selectedDepthIndex);
+  }, [selectedDepthIndex]);
+
+  useEffect(() => {
+    if (selectedTimeIndex === null || times.length === 0) {
       return undefined;
     }
 
-    return createOceanScene(containerRef.current, payload, range);
-  }, [payload, range]);
+    const requestedTime = times[selectedTimeIndex];
+    if (payloadRef.current?.time === requestedTime) {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setIsUpdating(true);
+    setError("");
+
+    getOceanLayers({
+      variable: "thetao",
+      time: requestedTime,
+      signal: controller.signal,
+    })
+      .then((layersPayload) => {
+        payloadRef.current = layersPayload;
+        setPayload(layersPayload);
+        setRange(getFiniteRange(layersPayload.layers.map((layer) => layer.values)));
+      })
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") {
+          setError("Unable to update the ocean layers for that forecast day.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsUpdating(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [selectedTimeIndex, times]);
+
+  const handleTimeChange = useCallback((index) => {
+    setSelectedTimeIndex(index);
+  }, []);
 
   return (
     <section aria-labelledby="ocean-scene-title">
@@ -143,6 +234,17 @@ function OceanScene3D() {
       <p>Drag to rotate · Scroll to zoom</p>
       {!payload && !error && <p>Loading eight Copernicus Marine depth layers…</p>}
       {error && <p role="alert">{error}</p>}
+      {payload && selectedTimeIndex !== null && (
+        <DepthTimeSlider
+          depths={payload.layers.map((layer) => layer.depth)}
+          selectedDepthIndex={selectedDepthIndex}
+          onDepthChange={setSelectedDepthIndex}
+          times={times}
+          selectedTimeIndex={selectedTimeIndex}
+          onTimeChange={handleTimeChange}
+          isUpdating={isUpdating}
+        />
+      )}
       <div
         ref={containerRef}
         role="img"
@@ -160,6 +262,7 @@ function OceanScene3D() {
         <p>
           Depths: {payload.layers.map((layer) => layer.depth.toFixed(0)).join(", ")} m
           {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
+          {" · Selected: "}{payload.layers[selectedDepthIndex].depth.toFixed(0)} m
           {" · "}{payload.time.slice(0, 10)}
         </p>
       )}

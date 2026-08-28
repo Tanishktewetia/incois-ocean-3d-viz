@@ -22,8 +22,11 @@ export async function getOceanSlice({ depth = 0, variable = "thetao", signal } =
   return response.json();
 }
 
-export async function getOceanLayers({ variable = "thetao", signal } = {}) {
+export async function getOceanLayers({ variable = "thetao", time, signal } = {}) {
   const parameters = new URLSearchParams({ variable });
+  if (time) {
+    parameters.set("time", time);
+  }
   const response = await fetch(`/api/layers?${parameters}`, { signal });
 
   if (!response.ok) {

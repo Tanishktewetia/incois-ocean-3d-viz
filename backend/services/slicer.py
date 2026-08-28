@@ -66,8 +66,8 @@ def request_slice(depth: float, variable: str) -> dict[str, Any]:
     }
 
 
-def request_layers(variable: str) -> dict[str, Any]:
-    """Return representative depth grids at the latest available model time."""
+def request_layers(variable: str, time: str | None = None) -> dict[str, Any]:
+    """Return representative depth grids at the requested model time."""
     if variable not in SUPPORTED_VARIABLES:
         raise ValueError(
             f"Unsupported variable '{variable}'. Supported variables: thetao."
@@ -79,9 +79,20 @@ def request_layers(variable: str) -> dict[str, Any]:
             f"Variable '{variable}' is missing from the Copernicus subset."
         )
 
+    try:
+        selected = (
+            dataset[variable].sel(
+                time=np.datetime64(time.removesuffix("Z")), method="nearest"
+            )
+            if time
+            else dataset[variable].isel(time=-1)
+        )
+    except ValueError as error:
+        raise ValueError(f"Invalid time '{time}'. Use an ISO 8601 timestamp.") from error
+
     layers = []
     for requested_depth in LAYER_DEPTHS:
-        data = dataset[variable].sel(depth=requested_depth, method="nearest").isel(time=-1)
+        data = selected.sel(depth=requested_depth, method="nearest")
         values = np.where(np.isfinite(data.values), data.values, None).tolist()
         layers.append(
             {
@@ -91,14 +102,18 @@ def request_layers(variable: str) -> dict[str, Any]:
             }
         )
 
-    latest = dataset[variable].isel(time=-1)
-    selected_time = np.datetime_as_string(latest["time"].values, unit="s") + "Z"
+    selected_time = np.datetime_as_string(selected["time"].values, unit="s") + "Z"
+    available_times = [
+        np.datetime_as_string(value, unit="s") + "Z"
+        for value in dataset["time"].values
+    ]
 
     return {
         "variable": variable,
-        "unit": latest.attrs.get("units", ""),
+        "unit": selected.attrs.get("units", ""),
         "time": selected_time,
-        "latitudes": latest["latitude"].values.tolist(),
-        "longitudes": latest["longitude"].values.tolist(),
+        "times": available_times,
+        "latitudes": selected["latitude"].values.tolist(),
+        "longitudes": selected["longitude"].values.tolist(),
         "layers": layers,
     }

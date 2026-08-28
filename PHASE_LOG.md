@@ -103,3 +103,28 @@
   6. Confirm the metadata lists depths approximately `0, 47, 92, 186, 541, 1062, 1452, 1942 m`, a cross-layer range of approximately `2.24–32.07 °C`, and date `2026-09-06`. The Phase 2 surface heatmap should remain visible below the scene.
   7. Optionally open `http://127.0.0.1:8000/api/layers?variable=thetao` and confirm HTTP 200 with eight layers, 205 latitudes, and 265 longitudes.
 - **Automated validation:** Python compilation and direct real-NetCDF service assertions passed, including strict JSON serialization, exact eight-layer depth selection, 205×265 grid dimensions, and unchanged `/api/slice` surface values. Layer means cool from approximately 29.10 °C at 0.49 m to 2.78 °C at 1941.89 m. `npm run build --prefix frontend` completed successfully with Three.js and OrbitControls. Live Uvicorn plus Vite validation confirmed proxied `/health`, `/api/layers`, and `/api/slice` responses, HTTP 400 for unsupported `/api/layers?variable=so`, and an HTTP 200 frontend entry page.
+
+## Phase 4 — Depth / Time Slider
+
+- **Status:** Complete
+- **Files changed:**
+  - `backend/routers/ocean.py`
+  - `backend/services/slicer.py`
+  - `frontend/src/api/client.js`
+  - `frontend/src/components/DepthTimeSlider.jsx`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `PHASE_LOG.md`
+- **Implementation:** Added discrete depth and forecast-date range controls to the existing Phase 3 scene. The depth slider moves through the same eight representative model levels and emphasizes the selected plane at 96% opacity while retaining the other seven planes at 28% opacity. The date slider spans all seven daily model coordinates from 2026-08-31 through 2026-09-06. A play/stop button advances chronologically every 1.5 seconds, waits for each layer request to complete, stops on the final forecast day, and offers replay from the first day.
+- **Scene integration:** The Phase 3 Three.js renderer, camera, OrbitControls, geometry, meshes, and textures remain mounted during slider interaction. Changing depth updates only existing material emphasis. Changing time calls the existing `/api/layers` route and replaces each existing `DataTexture` pixel buffer in place, then recalculates that day's shared cross-depth color range. It does not rebuild the 3D scene.
+- **API:** Extended `GET /api/layers` with optional `time=<ISO 8601 timestamp>` nearest-time selection and a `times` array containing all available model times. Omitting `time` still returns the latest model day, preserving Phase 3 behavior. Invalid timestamps return HTTP 400, and `/api/slice` remains unchanged.
+- **Deviations from the plan:** The architecture did not define how a depth control should affect the eight-plane stack. The user chose to keep all eight planes visible and highlight one representative plane while time changes refresh all eight. Playback does not loop because the demo script specifies real forecast days, not a loop. No Phase 5+ behavior or new dependency was added.
+- **Credentials/data access:** No new credentials or downloads were required; Phase 4 reuses the gitignored seven-day Copernicus subset.
+- **Manual test:**
+  1. Ensure `backend/data/copernicus_thetao_india_20260831_20260906.nc` exists and install existing dependencies if needed.
+  2. From the repository root, start the API with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`.
+  3. In another terminal, start Vite with `npm run dev --prefix frontend`, then open `http://localhost:5173`.
+  4. Drag the depth slider through all eight positions. Confirm the label moves from approximately `0 m` to `1942 m`, the selected plane becomes prominent, the other seven remain visible, and rotation/zoom continue to work without the camera resetting.
+  5. Drag the date slider from `2026-08-31` through `2026-09-06`. Confirm the status briefly reads **Updating ocean layers…**, then **Ocean layers ready**, and plane textures/temperature metadata update without resetting the camera.
+  6. Select an earlier day and click **Play forecast**. Confirm the dates advance in order, each request completes before the next advance, **Stop animation** pauses playback, and playback stops on `2026-09-06`. Click **Replay forecast** to restart at `2026-08-31`.
+  7. Confirm the Phase 2 surface heatmap still appears below the scene and continues showing the latest model day.
+- **Automated validation:** Python compilation and direct service checks passed for seven available times, eight layers per date, latest-time backward compatibility, nearest-time selection, invalid-time rejection, strict JSON, time-varying surface values, and unchanged `/api/slice` values. `npm run build --prefix frontend` passed. Live Uvicorn plus Vite proxy checks confirmed first/latest/nearest date requests, eight layers per day, HTTP 400 for an invalid time, the preserved slice endpoint, and HTTP 200 frontend delivery.
