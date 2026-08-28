@@ -35,3 +35,21 @@ export async function getOceanLayers({ variable = "thetao", time, signal } = {})
 
   return response.json();
 }
+
+export async function getArgoProfiles({ signal } = {}) {
+  const response = await fetch("/api/argo", { signal });
+  if (!response.ok) {
+    throw new Error(`Argo profiles request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getArgoProfile(profileId, { signal } = {}) {
+  const response = await fetch(`/api/argo/${encodeURIComponent(profileId)}/profile`, {
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Argo profile request failed with status ${response.status}`);
+  }
+  return response.json();
+}

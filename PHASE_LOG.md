@@ -128,3 +128,35 @@
   6. Select an earlier day and click **Play forecast**. Confirm the dates advance in order, each request completes before the next advance, **Stop animation** pauses playback, and playback stops on `2026-09-06`. Click **Replay forecast** to restart at `2026-08-31`.
   7. Confirm the Phase 2 surface heatmap still appears below the scene and continues showing the latest model day.
 - **Automated validation:** Python compilation and direct service checks passed for seven available times, eight layers per date, latest-time backward compatibility, nearest-time selection, invalid-time rejection, strict JSON, time-varying surface values, and unchanged `/api/slice` values. `npm run build --prefix frontend` passed. Live Uvicorn plus Vite proxy checks confirmed first/latest/nearest date requests, eight layers per day, HTTP 400 for an invalid time, the preserved slice endpoint, and HTTP 200 frontend delivery.
+
+## Phase 5 — Argo Overlay + Profile Chart
+
+- **Status:** Complete
+- **Files changed:**
+  - `backend/main.py`
+  - `backend/routers/argo.py`
+  - `backend/services/argo.py`
+  - `backend/services/slicer.py`
+  - `frontend/package.json`
+  - `frontend/package-lock.json`
+  - `frontend/src/api/client.js`
+  - `frontend/src/components/ArgoOverlay.jsx`
+  - `frontend/src/components/DepthTimeSlider.jsx`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/components/ProfileChart.jsx`
+  - `PHASE_LOG.md`
+- **Dataset:** Selected the newest fully completed seven-day interval at implementation time, `2026-08-18` through `2026-08-24`, with both model and sensor coverage in 68–90°E, 5–22°N. Downloaded 38 individual core-profile NetCDF files listed by the official Argo GDAC global profile index from `https://data-argo.ifremer.fr/dac/`, plus the matching Copernicus Marine `thetao` subset from `cmems_mod_glo_phy-thetao_anfc_0.083deg_P1D-m` at 0–2000 m.
+- **Local data:** `backend/data/argo_20260818_20260824/` contains 38 Argo files (2,288,204 bytes total), and `backend/data/copernicus_thetao_india_20260818_20260824.nc` contains seven model days (60,869,823 bytes). Both are intentionally gitignored. The Copernicus file SHA-256 is `68DEACF8C41B86A1DFFB0777ED64D9AEFBAEABB5ABD498AEC7B9F4F3C16DE87D`.
+- **Backend:** Added `GET /api/argo` catalog metadata and `GET /api/argo/{id}/profile` measurements. The parser uses the primary physical profile row, requires good position/time QC, accepts Argo pressure/temperature QC flags 1 and 2, prefers adjusted values in adjusted/delayed mode when available, converts dbar to metres with the latitude-aware UNESCO 1983 formula, and returns HTTP 404 for unknown IDs or HTTP 503 when local data is unavailable.
+- **Frontend:** Added 38 orange geographic markers to the existing Three.js scene without rebuilding its renderer, camera, controls, planes, or textures. Raycasting selects and highlights a marker. The selected real sensor profile is fetched on demand and displayed in a Chart.js temperature-vs-depth line chart with depth increasing downward.
+- **Deviations from the plan:** The prior model subset (`2026-08-31` through `2026-09-06`) was in the future, so no real Argo data could match it. With user approval, both datasets were moved to the recent completed interval above to preserve the architecture's required region/date match for Phase 6. Existing UI wording was changed from “forecast date” to “model date.” Phase 5 exposes sensor data only; no model-profile interpolation, RMSE, currents, or later-phase behavior was added.
+- **Credentials/data access:** Reused the user's existing local Copernicus Marine authentication. Argo GDAC access is public. No credentials, NetCDF data, index files, or generated output are tracked by Git.
+- **Manual test:**
+  1. Ensure the matching Copernicus file and 38-file Argo directory named above exist under `backend/data/`.
+  2. From the repository root, start the API with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`.
+  3. In another terminal, run `npm install --prefix frontend`, then `npm run dev --prefix frontend`, and open `http://localhost:5173`.
+  4. Confirm 38 orange dots appear across the 3D ocean surface and the Argo text reports `2026-08-18` through `2026-08-24`.
+  5. Rotate/zoom the scene, click an orange dot, and confirm it turns white and grows while the camera and ocean stack remain in place.
+  6. Confirm the panel identifies the float/cycle, observation time and coordinates, then shows a sensible orange temperature profile with **Temperature (°C)** horizontally and **Depth (m)** increasing downward.
+  7. Click several dots, including shallow and approximately 2000 m profiles, and confirm the metadata/chart changes. Move model dates and depths afterward and confirm marker selection and scene controls continue to work.
+- **Automated validation:** Python compilation and direct service validation passed for all 38 real profiles, including bounding box/date membership, accepted QC data, depth ordering, physical sanity limits, strict JSON serialization, and seven matching model dates. Live Uvicorn and Vite proxy checks passed for both Argo routes, unknown-ID HTTP 404 behavior, model dates, and frontend HTTP 200 delivery. `npm run build --prefix frontend` passed; Vite reports only its non-fatal large-chunk warning after adding the architecture-mandated Chart.js dependency.

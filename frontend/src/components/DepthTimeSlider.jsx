@@ -40,7 +40,7 @@ function DepthTimeSlider({
 
   return (
     <div
-      aria-label="Ocean depth and forecast time controls"
+      aria-label="Ocean depth and model time controls"
       style={{
         display: "grid",
         gap: "16px",
@@ -64,7 +64,7 @@ function DepthTimeSlider({
       </label>
 
       <label>
-        <strong>Forecast date: {times[selectedTimeIndex].slice(0, 10)}</strong>
+        <strong>Model date: {times[selectedTimeIndex].slice(0, 10)}</strong>
         <input
           type="range"
           min="0"
@@ -78,7 +78,7 @@ function DepthTimeSlider({
 
       <div>
         <button type="button" onClick={togglePlayback}>
-          {isPlaying ? "Stop animation" : atFinalTime ? "Replay forecast" : "Play forecast"}
+          {isPlaying ? "Stop animation" : atFinalTime ? "Replay dates" : "Play dates"}
         </button>
         <span aria-live="polite" style={{ marginLeft: "12px" }}>
           {isUpdating ? "Updating ocean layers…" : "Ocean layers ready"}

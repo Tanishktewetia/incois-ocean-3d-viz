@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { getOceanLayers } from "../api/client.js";
+import ArgoOverlay from "./ArgoOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
 
@@ -9,7 +10,7 @@ const SCENE_HEIGHT = 560;
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
 
-function createOceanScene(container, payload, range) {
+function createOceanScene(container, payload, range, onArgoSelect) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07131d);
 
@@ -34,6 +35,13 @@ function createOceanScene(container, payload, range) {
   const textures = [];
   const materials = [];
   const planes = [];
+  const argoMarkers = new THREE.Group();
+  const markerGeometry = new THREE.SphereGeometry(0.1, 16, 12);
+  const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffa629 });
+  const selectedMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+  scene.add(argoMarkers);
 
   payload.layers.forEach((layer) => {
     const pixels = createColorBuffer(
@@ -76,6 +84,18 @@ function createOceanScene(container, payload, range) {
   );
   scene.add(frame);
 
+  function handlePointerClick(event) {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+    pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects(argoMarkers.children, false)[0];
+    if (hit) {
+      onArgoSelect(hit.object.userData.profileId);
+    }
+  }
+  renderer.domElement.addEventListener("click", handlePointerClick);
+
   function resize() {
     const width = Math.max(container.clientWidth, 320);
     renderer.setSize(width, SCENE_HEIGHT, false);
@@ -96,6 +116,27 @@ function createOceanScene(container, payload, range) {
   animate();
 
   return {
+    setArgoProfiles(profiles) {
+      argoMarkers.clear();
+      profiles.forEach((profile) => {
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.set(
+          ((profile.longitude - payload.longitudes[0]) / longitudeSpan - 0.5) * PLANE_WIDTH,
+          ((profile.latitude - payload.latitudes[0]) / latitudeSpan - 0.5) * planeHeight,
+          STACK_HEIGHT / 2 + 0.18,
+        );
+        marker.userData.profileId = profile.id;
+        marker.renderOrder = 100;
+        argoMarkers.add(marker);
+      });
+    },
+    selectArgoProfile(profileId) {
+      argoMarkers.children.forEach((marker) => {
+        const selected = marker.userData.profileId === profileId;
+        marker.material = selected ? selectedMarkerMaterial : markerMaterial;
+        marker.scale.setScalar(selected ? 1.65 : 1);
+      });
+    },
     updateLayers(nextPayload, nextRange) {
       nextPayload.layers.forEach((layer, index) => {
         const pixels = createColorBuffer(
@@ -119,8 +160,12 @@ function createOceanScene(container, payload, range) {
     },
     dispose() {
       cancelAnimationFrame(animationFrame);
+      renderer.domElement.removeEventListener("click", handlePointerClick);
       resizeObserver.disconnect();
       controls.dispose();
+      markerGeometry.dispose();
+      markerMaterial.dispose();
+      selectedMarkerMaterial.dispose();
       textures.forEach((texture) => texture.dispose());
       materials.forEach((material) => material.dispose());
       geometry.dispose();
@@ -136,11 +181,13 @@ function OceanScene3D() {
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
   const payloadRef = useRef(null);
+  const argoProfilesRef = useRef([]);
   const [payload, setPayload] = useState(null);
   const [range, setRange] = useState(null);
   const [times, setTimes] = useState([]);
   const [selectedDepthIndex, setSelectedDepthIndex] = useState(0);
   const [selectedTimeIndex, setSelectedTimeIndex] = useState(null);
+  const [selectedArgoProfileId, setSelectedArgoProfileId] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
 
@@ -170,8 +217,14 @@ function OceanScene3D() {
     }
 
     if (!sceneApiRef.current) {
-      sceneApiRef.current = createOceanScene(containerRef.current, payload, range);
+      sceneApiRef.current = createOceanScene(
+        containerRef.current,
+        payload,
+        range,
+        setSelectedArgoProfileId,
+      );
       sceneApiRef.current.highlightDepth(selectedDepthIndex);
+      sceneApiRef.current.setArgoProfiles(argoProfilesRef.current);
     } else {
       sceneApiRef.current.updateLayers(payload, range);
     }
@@ -185,6 +238,10 @@ function OceanScene3D() {
   useEffect(() => {
     sceneApiRef.current?.highlightDepth(selectedDepthIndex);
   }, [selectedDepthIndex]);
+
+  useEffect(() => {
+    sceneApiRef.current?.selectArgoProfile(selectedArgoProfileId);
+  }, [selectedArgoProfileId]);
 
   useEffect(() => {
     if (selectedTimeIndex === null || times.length === 0) {
@@ -212,7 +269,7 @@ function OceanScene3D() {
       })
       .catch((requestError) => {
         if (requestError.name !== "AbortError") {
-          setError("Unable to update the ocean layers for that forecast day.");
+          setError("Unable to update the ocean layers for that model day.");
         }
       })
       .finally(() => {
@@ -226,6 +283,11 @@ function OceanScene3D() {
 
   const handleTimeChange = useCallback((index) => {
     setSelectedTimeIndex(index);
+  }, []);
+
+  const handleArgoProfilesLoaded = useCallback((profiles) => {
+    argoProfilesRef.current = profiles;
+    sceneApiRef.current?.setArgoProfiles(profiles);
   }, []);
 
   return (
@@ -266,6 +328,10 @@ function OceanScene3D() {
           {" · "}{payload.time.slice(0, 10)}
         </p>
       )}
+      <ArgoOverlay
+        selectedProfileId={selectedArgoProfileId}
+        onProfilesLoaded={handleArgoProfilesLoaded}
+      />
     </section>
   );
 }

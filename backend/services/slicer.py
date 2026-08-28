@@ -8,7 +8,7 @@ import xarray as xr
 DATA_FILE = (
     Path(__file__).resolve().parents[1]
     / "data"
-    / "copernicus_thetao_india_20260831_20260906.nc"
+    / "copernicus_thetao_india_20260818_20260824.nc"
 )
 SUPPORTED_VARIABLES = {"thetao"}
 LAYER_DEPTHS = (0, 50, 100, 200, 500, 1000, 1500, 2000)
