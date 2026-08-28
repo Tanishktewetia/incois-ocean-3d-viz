@@ -26,6 +26,20 @@ function ProfileChart({ profile }) {
             pointHitRadius: 5,
             tension: 0,
           },
+          {
+            label: "Copernicus model temperature",
+            data: profile.model_comparison.model_profile.map((measurement) => ({
+              x: measurement.temperature,
+              y: measurement.depth,
+            })),
+            borderColor: "#4fc3f7",
+            backgroundColor: "#4fc3f7",
+            borderWidth: 2,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            pointHitRadius: 5,
+            tension: 0,
+          },
         ],
       },
       options: {
@@ -53,7 +67,10 @@ function ProfileChart({ profile }) {
 
   return (
     <div style={{ height: "420px" }}>
-      <canvas ref={canvasRef} aria-label="Argo depth versus temperature profile" />
+      <canvas
+        ref={canvasRef}
+        aria-label="Argo and Copernicus model depth versus temperature profiles"
+      />
     </div>
   );
 }

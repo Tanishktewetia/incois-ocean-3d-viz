@@ -160,3 +160,27 @@
   6. Confirm the panel identifies the float/cycle, observation time and coordinates, then shows a sensible orange temperature profile with **Temperature (°C)** horizontally and **Depth (m)** increasing downward.
   7. Click several dots, including shallow and approximately 2000 m profiles, and confirm the metadata/chart changes. Move model dates and depths afterward and confirm marker selection and scene controls continue to work.
 - **Automated validation:** Python compilation and direct service validation passed for all 38 real profiles, including bounding box/date membership, accepted QC data, depth ordering, physical sanity limits, strict JSON serialization, and seven matching model dates. Live Uvicorn and Vite proxy checks passed for both Argo routes, unknown-ID HTTP 404 behavior, model dates, and frontend HTTP 200 delivery. `npm run build --prefix frontend` passed; Vite reports only its non-fatal large-chunk warning after adding the architecture-mandated Chart.js dependency.
+
+## Phase 6 — Model vs Sensor RMSE
+
+- **Status:** Complete
+- **Files changed:**
+  - `backend/routers/argo.py`
+  - `backend/services/argo.py`
+  - `backend/services/comparison.py`
+  - `backend/services/metrics.py`
+  - `backend/tests/test_comparison.py`
+  - `frontend/src/components/ArgoOverlay.jsx`
+  - `frontend/src/components/ProfileChart.jsx`
+  - `PHASE_LOG.md`
+- **Pure RMSE function:** Added `calculate_rmse(observed, modeled)` as a small, side-effect-free function. It computes `sqrt(mean((modeled - observed)²))` and explicitly rejects empty, unequal-length, or non-finite inputs. It was implemented and passed its isolated unit tests before model interpolation or chart integration was added.
+- **Model matching:** For each selected Argo profile, the backend chooses the nearest available daily Copernicus model timestamp. It bilinearly interpolates every model depth level to the float latitude/longitude, renormalizing weights over finite ocean corners near land. It then linearly interpolates the resulting vertical model profile to every QC-accepted Argo depth inside valid model coverage. RMSE uses only these finite, colocated depth pairs.
+- **API:** Extended the existing `GET /api/argo/{id}/profile` response with `model_comparison`, containing the selected model time, interpolation methods, 40-level colocated model profile, auditable observation/model pairs and residuals, paired count, and temperature RMSE. Missing model data returns HTTP 503, while unknown profile IDs retain HTTP 404 behavior.
+- **Frontend:** The existing profile chart now overlays the Argo observations in solid orange and the colocated Copernicus profile in dashed blue. The panel reports RMSE in °C, pair count, selected model day, and a concise interpolation explanation.
+- **Deviations from the plan:** The architecture did not prescribe interpolation details or a new endpoint. The comparison is included in the existing profile response so one float selection requires one request. No SQLite/JSON metadata store was needed because the Phase 5 cached local profile catalog remains sufficient. No Phase 7 current-particle behavior was added.
+- **Manual test:**
+  1. Start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload` and the frontend with `npm run dev --prefix frontend`, then open `http://localhost:5173`.
+  2. Click several orange Argo markers. Confirm each chart has a solid orange observed line and dashed blue Copernicus model line, and that the RMSE/pair count/model day update per float.
+  3. Confirm both lines use temperature in °C on the horizontal axis and depth increasing downward, and that the original marker selection, depth slider, model-date slider, rotation, and zoom still work.
+  4. To sanity-check one score, request `http://127.0.0.1:8000/api/argo/R5907180_055/profile`. Square every `model_comparison.comparison_points[].difference`, sum them, divide by `paired_count`, then take the square root. For the current data, `sqrt(5.784198172094287 / 99) = 0.241715212931600 °C`, which rounds to the displayed `0.242 °C`.
+- **Automated validation:** Eight `unittest` tests pass for known/zero RMSE, invalid RMSE inputs, center-point bilinear interpolation, coastal missing-cell weight normalization, and out-of-grid rejection. Python compilation and integrated checks pass for all 38 real profiles: 25–987 finite pairs each, strict JSON, correctly selected nearest model time, sorted paired depths, and independently recomputed RMSE. The observed RMSE range is approximately 0.077–0.553 °C. Live Uvicorn and Vite proxy checks passed with identical direct/proxied RMSE, 40 returned model levels, unknown-ID HTTP 404, and frontend HTTP 200. `npm run build --prefix frontend` passed with only the existing non-fatal large-chunk warning.

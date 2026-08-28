@@ -61,6 +61,15 @@ function ArgoOverlay({ selectedProfileId, onProfilesLoaded }) {
             {profile.latitude.toFixed(3)}°N, {profile.longitude.toFixed(3)}°E ·{" "}
             {profile.levels} QC-accepted levels · {profile.maximum_depth.toFixed(0)} m
           </p>
+          <p>
+            <strong>Temperature RMSE: {profile.model_comparison.rmse.toFixed(3)} °C</strong>
+            {" · "}{profile.model_comparison.paired_count} paired observations
+            {" · Model day: "}{profile.model_comparison.model_time.slice(0, 10)}
+          </p>
+          <p>
+            Copernicus model values are bilinearly interpolated at the float location,
+            then linearly interpolated to Argo depths for RMSE.
+          </p>
           <ProfileChart profile={profile} />
         </article>
       )}

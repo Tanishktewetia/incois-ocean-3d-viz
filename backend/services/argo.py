@@ -5,6 +5,8 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
+from backend.services.comparison import compare_model_to_profile
+
 ARGO_DIRECTORY = (
     Path(__file__).resolve().parents[1] / "data" / "argo_20260818_20260824"
 )
@@ -158,4 +160,5 @@ def request_argo_profile(profile_id: str) -> dict[str, Any]:
     profile = _read_profile(ARGO_DIRECTORY / f"{profile_id}.nc", True)
     if profile is None:
         raise ArgoDataUnavailableError(f"Argo profile '{profile_id}' has no usable data.")
+    profile["model_comparison"] = compare_model_to_profile(profile)
     return profile
