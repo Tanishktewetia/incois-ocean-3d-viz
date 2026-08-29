@@ -17,7 +17,7 @@ function drawHeatmap(canvas, slice) {
   return { minimum, maximum };
 }
 
-function HeatmapCanvas() {
+function HeatmapCanvas({ dataSource }) {
   const canvasRef = useRef(null);
   const [slice, setSlice] = useState(null);
   const [range, setRange] = useState(null);
@@ -26,7 +26,14 @@ function HeatmapCanvas() {
   useEffect(() => {
     const controller = new AbortController();
 
-    getOceanSlice({ depth: 0, variable: "thetao", signal: controller.signal })
+    setSlice(null);
+    setError("");
+    getOceanSlice({
+      depth: 0,
+      variable: "thetao",
+      source: dataSource,
+      signal: controller.signal,
+    })
       .then(setSlice)
       .catch((requestError) => {
         if (requestError.name !== "AbortError") {
@@ -35,7 +42,7 @@ function HeatmapCanvas() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [dataSource]);
 
   useEffect(() => {
     if (slice && canvasRef.current) {
@@ -50,7 +57,7 @@ function HeatmapCanvas() {
   return (
     <section aria-labelledby="heatmap-title">
       <h2 id="heatmap-title">Surface temperature</h2>
-      {!slice && <p>Loading Copernicus Marine data…</p>}
+      {!slice && <p>Loading {dataSource === "demo" ? "Copernicus Marine" : "uploaded"} data…</p>}
       <canvas
         ref={canvasRef}
         role="img"
@@ -70,6 +77,7 @@ function HeatmapCanvas() {
           {" · "}{slice.depth.toFixed(2)} m
           {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
           {" · "}{slice.time.slice(0, 10)}
+          {" · "}{slice.source === "demo" ? "Demo dataset" : "My upload"}
         </p>
       )}
     </section>

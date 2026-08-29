@@ -195,7 +195,7 @@ function createOceanScene(container, payload, range, onArgoSelect) {
   };
 }
 
-function OceanScene3D() {
+function OceanScene3D({ dataSource }) {
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
   const payloadRef = useRef(null);
@@ -215,13 +215,19 @@ function OceanScene3D() {
   useEffect(() => {
     const controller = new AbortController();
 
-    getOceanLayers({ variable: "thetao", signal: controller.signal })
+    setError("");
+    getOceanLayers({
+      variable: "thetao",
+      source: dataSource,
+      signal: controller.signal,
+    })
       .then((layersPayload) => {
         payloadRef.current = layersPayload;
         setPayload(layersPayload);
         setRange(getFiniteRange(layersPayload.layers.map((layer) => layer.values)));
         setTimes(layersPayload.times);
         setSelectedTimeIndex(layersPayload.times.indexOf(layersPayload.time));
+        setSelectedDepthIndex(0);
       })
       .catch((requestError) => {
         if (requestError.name !== "AbortError") {
@@ -230,7 +236,7 @@ function OceanScene3D() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [dataSource]);
 
   useEffect(() => {
     if (!containerRef.current || !payload || !range) {
@@ -270,6 +276,9 @@ function OceanScene3D() {
     }
 
     const requestedTime = times[selectedTimeIndex];
+    if (payloadRef.current?.source !== dataSource) {
+      return undefined;
+    }
     if (payloadRef.current?.time === requestedTime) {
       return undefined;
     }
@@ -281,6 +290,7 @@ function OceanScene3D() {
     getOceanLayers({
       variable: "thetao",
       time: requestedTime,
+      source: dataSource,
       signal: controller.signal,
     })
       .then((layersPayload) => {
@@ -300,7 +310,14 @@ function OceanScene3D() {
       });
 
     return () => controller.abort();
-  }, [selectedTimeIndex, times]);
+  }, [dataSource, selectedTimeIndex, times]);
+
+  useEffect(() => {
+    if (dataSource === "upload") {
+      setParticlesEnabled(false);
+      sceneApiRef.current?.setParticlesVisible(false);
+    }
+  }, [dataSource]);
 
   useEffect(() => {
     sceneApiRef.current?.setParticlesVisible(particlesEnabled && currentField !== null);
@@ -371,6 +388,7 @@ function OceanScene3D() {
             <input
               type="checkbox"
               checked={particlesEnabled}
+              disabled={dataSource === "upload"}
               onChange={(event) => setParticlesEnabled(event.target.checked)}
             />{" "}
             <strong>Animate real surface currents</strong>
@@ -380,6 +398,7 @@ function OceanScene3D() {
             {currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)} · ${currentField.depth.toFixed(2)} m`}
             {currentStatus === "error" && "Current vectors unavailable."}
             {currentStatus === "off" && "Off"}
+            {dataSource === "upload" && " · currents require the demo uo/vo dataset"}
           </span>
           {currentStatus === "ready" && (
             <div style={{ marginTop: "6px" }}>
@@ -407,6 +426,7 @@ function OceanScene3D() {
           {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
           {" · Selected: "}{payload.layers[selectedDepthIndex].depth.toFixed(0)} m
           {" · "}{payload.time.slice(0, 10)}
+          {" · "}{payload.source === "demo" ? "Demo dataset" : "My upload"}
         </p>
       )}
       <ArgoOverlay

@@ -1,4 +1,5 @@
 from functools import lru_cache
+import os
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,11 @@ CURRENTS_DATA_FILE = (
 SUPPORTED_VARIABLES = {"thetao"}
 LAYER_DEPTHS = (0, 50, 100, 200, 500, 1000, 1500, 2000)
 CURRENT_GRID_STRIDE = 4
+UPLOAD_DIRECTORY = Path(__file__).resolve().parents[1] / "uploads"
+UPLOAD_DATA_FILE = UPLOAD_DIRECTORY / "scientist_upload.nc"
+UPLOAD_TEMP_FILE = UPLOAD_DIRECTORY / "scientist_upload.part"
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+DATA_SOURCES = {"demo", "upload"}
 
 
 class OceanDataUnavailableError(RuntimeError):
@@ -38,6 +44,125 @@ def get_dataset() -> xr.Dataset:
         raise OceanDataUnavailableError(
             f"Unable to open Copernicus subset at {DATA_FILE}."
         ) from error
+
+
+@lru_cache(maxsize=1)
+def get_upload_dataset() -> xr.Dataset:
+    """Open the latest validated scientist upload once."""
+    if not UPLOAD_DATA_FILE.is_file():
+        raise OceanDataUnavailableError(
+            "No scientist dataset has been uploaded yet."
+        )
+
+    try:
+        return xr.open_dataset(UPLOAD_DATA_FILE)
+    except (OSError, ValueError) as error:
+        raise OceanDataUnavailableError(
+            "Unable to open the uploaded scientist dataset."
+        ) from error
+
+
+def select_dataset(source: str) -> xr.Dataset:
+    if source not in DATA_SOURCES:
+        raise ValueError("Invalid source. Use 'demo' or 'upload'.")
+    return get_dataset() if source == "demo" else get_upload_dataset()
+
+
+def validate_upload(path: Path) -> dict[str, Any]:
+    """Validate the NetCDF contract consumed by the existing slicer."""
+    try:
+        with xr.open_dataset(path) as dataset:
+            if "thetao" not in dataset:
+                raise ValueError("NetCDF must contain a 'thetao' variable.")
+
+            variable = dataset["thetao"]
+            required_dimensions = ("time", "depth", "latitude", "longitude")
+            if variable.dims != required_dimensions:
+                raise ValueError(
+                    "'thetao' dimensions must be ordered as "
+                    "(time, depth, latitude, longitude)."
+                )
+
+            for coordinate_name in required_dimensions:
+                if coordinate_name not in dataset.coords:
+                    raise ValueError(
+                        f"NetCDF must contain a '{coordinate_name}' coordinate."
+                    )
+                coordinate = dataset[coordinate_name]
+                if coordinate.ndim != 1 or coordinate.size == 0:
+                    raise ValueError(
+                        f"Coordinate '{coordinate_name}' must be a non-empty 1-D array."
+                    )
+
+            try:
+                times = np.asarray(dataset["time"].values, dtype="datetime64[ns]")
+            except (TypeError, ValueError) as error:
+                raise ValueError("Coordinate 'time' must contain valid datetimes.") from error
+            if np.isnat(times).any():
+                raise ValueError("Coordinate 'time' must contain valid datetimes.")
+
+            for coordinate_name in ("depth", "latitude", "longitude"):
+                try:
+                    values = np.asarray(dataset[coordinate_name].values, dtype=float)
+                except (TypeError, ValueError) as error:
+                    raise ValueError(
+                        f"Coordinate '{coordinate_name}' must be numeric."
+                    ) from error
+                if not np.isfinite(values).all():
+                    raise ValueError(
+                        f"Coordinate '{coordinate_name}' must contain only finite values."
+                    )
+                if values.size > 1 and not np.all(np.diff(values) > 0):
+                    raise ValueError(
+                        f"Coordinate '{coordinate_name}' must be strictly increasing."
+                    )
+
+            if dataset.sizes["latitude"] < 2 or dataset.sizes["longitude"] < 2:
+                raise ValueError(
+                    "Coordinates 'latitude' and 'longitude' must each contain at least two values."
+                )
+            if not bool(np.isfinite(variable).any().compute().item()):
+                raise ValueError("Variable 'thetao' must contain at least one finite value.")
+
+            return {
+                "variable": "thetao",
+                "unit": variable.attrs.get("units", ""),
+                "times": dataset.sizes["time"],
+                "depths": dataset.sizes["depth"],
+                "latitudes": dataset.sizes["latitude"],
+                "longitudes": dataset.sizes["longitude"],
+            }
+    except ValueError:
+        raise
+    except (OSError, TypeError) as error:
+        raise ValueError("File is not a readable NetCDF dataset.") from error
+
+
+def promote_upload(path: Path) -> dict[str, Any]:
+    """Validate and atomically install a temporary uploaded NetCDF file."""
+    metadata = validate_upload(path)
+    if get_upload_dataset.cache_info().currsize:
+        get_upload_dataset().close()
+        get_upload_dataset.cache_clear()
+    os.replace(path, UPLOAD_DATA_FILE)
+    return metadata
+
+
+def save_upload_stream(file_object: Any) -> dict[str, Any]:
+    """Persist a bounded stream, then validate and promote it."""
+    UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    total_bytes = 0
+    try:
+        with UPLOAD_TEMP_FILE.open("wb") as destination:
+            while chunk := file_object.read(1024 * 1024):
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_BYTES:
+                    raise ValueError("NetCDF upload exceeds the 100 MiB limit.")
+                destination.write(chunk)
+        metadata = promote_upload(UPLOAD_TEMP_FILE)
+        return {**metadata, "size_bytes": total_bytes, "source": "upload"}
+    finally:
+        UPLOAD_TEMP_FILE.unlink(missing_ok=True)
 
 
 @lru_cache(maxsize=1)
@@ -62,14 +187,14 @@ def get_currents_dataset() -> xr.Dataset:
     return dataset
 
 
-def request_slice(depth: float, variable: str) -> dict[str, Any]:
+def request_slice(depth: float, variable: str, source: str = "demo") -> dict[str, Any]:
     """Return the nearest-depth grid at the latest available model time."""
     if variable not in SUPPORTED_VARIABLES:
         raise ValueError(
             f"Unsupported variable '{variable}'. Supported variables: thetao."
         )
 
-    dataset = get_dataset()
+    dataset = select_dataset(source)
     if variable not in dataset:
         raise OceanDataUnavailableError(
             f"Variable '{variable}' is missing from the Copernicus subset."
@@ -84,6 +209,7 @@ def request_slice(depth: float, variable: str) -> dict[str, Any]:
 
     return {
         "variable": variable,
+        "source": source,
         "unit": data.attrs.get("units", ""),
         "requested_depth": depth,
         "depth": selected_depth,
@@ -94,14 +220,16 @@ def request_slice(depth: float, variable: str) -> dict[str, Any]:
     }
 
 
-def request_layers(variable: str, time: str | None = None) -> dict[str, Any]:
+def request_layers(
+    variable: str, time: str | None = None, source: str = "demo"
+) -> dict[str, Any]:
     """Return representative depth grids at the requested model time."""
     if variable not in SUPPORTED_VARIABLES:
         raise ValueError(
             f"Unsupported variable '{variable}'. Supported variables: thetao."
         )
 
-    dataset = get_dataset()
+    dataset = select_dataset(source)
     if variable not in dataset:
         raise OceanDataUnavailableError(
             f"Variable '{variable}' is missing from the Copernicus subset."
@@ -138,6 +266,7 @@ def request_layers(variable: str, time: str | None = None) -> dict[str, Any]:
 
     return {
         "variable": variable,
+        "source": source,
         "unit": selected.attrs.get("units", ""),
         "time": selected_time,
         "times": available_times,

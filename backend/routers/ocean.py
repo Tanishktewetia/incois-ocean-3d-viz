@@ -1,15 +1,34 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
 from backend.services.slicer import (
     OceanDataUnavailableError,
     request_currents,
     request_layers,
     request_slice,
+    save_upload_stream,
 )
 
 router = APIRouter(prefix="/api", tags=["ocean"])
+
+
+@router.post("/upload", status_code=status.HTTP_201_CREATED)
+def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
+    if not file.filename or not file.filename.lower().endswith(".nc"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload must be a NetCDF file with a .nc extension.",
+        )
+    try:
+        return {"filename": file.filename, **save_upload_stream(file.file)}
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    finally:
+        file.file.close()
 
 
 @router.get("/currents")
@@ -32,9 +51,10 @@ def get_currents(time: str | None = None) -> dict[str, Any]:
 def get_slice(
     depth: Annotated[float, Query(ge=0, le=2000)] = 0,
     variable: str = "thetao",
+    source: str = "demo",
 ) -> dict[str, Any]:
     try:
-        return request_slice(depth=depth, variable=variable)
+        return request_slice(depth=depth, variable=variable, source=source)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -48,9 +68,11 @@ def get_slice(
 
 
 @router.get("/layers")
-def get_layers(variable: str = "thetao", time: str | None = None) -> dict[str, Any]:
+def get_layers(
+    variable: str = "thetao", time: str | None = None, source: str = "demo"
+) -> dict[str, Any]:
     try:
-        return request_layers(variable=variable, time=time)
+        return request_layers(variable=variable, time=time, source=source)
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

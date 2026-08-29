@@ -8,10 +8,39 @@ export async function getHealth() {
   return response.json();
 }
 
-export async function getOceanSlice({ depth = 0, variable = "thetao", signal } = {}) {
+async function responseError(response, fallback) {
+  try {
+    const payload = await response.json();
+    return new Error(payload.detail || fallback);
+  } catch {
+    return new Error(fallback);
+  }
+}
+
+export async function uploadOceanDataset(file, { signal } = {}) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/upload", {
+    method: "POST",
+    body: formData,
+    signal,
+  });
+  if (!response.ok) {
+    throw await responseError(response, `Dataset upload failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getOceanSlice({
+  depth = 0,
+  variable = "thetao",
+  source = "demo",
+  signal,
+} = {}) {
   const parameters = new URLSearchParams({
     depth: String(depth),
     variable,
+    source,
   });
   const response = await fetch(`/api/slice?${parameters}`, { signal });
 
@@ -22,8 +51,13 @@ export async function getOceanSlice({ depth = 0, variable = "thetao", signal } =
   return response.json();
 }
 
-export async function getOceanLayers({ variable = "thetao", time, signal } = {}) {
-  const parameters = new URLSearchParams({ variable });
+export async function getOceanLayers({
+  variable = "thetao",
+  time,
+  source = "demo",
+  signal,
+} = {}) {
+  const parameters = new URLSearchParams({ variable, source });
   if (time) {
     parameters.set("time", time);
   }

@@ -208,3 +208,33 @@
   4. Move the model-date slider through all seven days. Confirm particles briefly hide while loading, the displayed current date follows the temperature date, and flow patterns change without rebuilding/resetting the camera or Argo selection.
   5. Toggle particles off/on, rotate and zoom the scene, play the date animation, and click Argo markers. Confirm controls remain responsive and the existing temperature layers/profile chart still work.
 - **Automated validation:** All 11 backend unit tests pass, including three new current-field tests for nearest-time/downsample selection, paired missing values, and invalid timestamps; Python compilation passes. The real 7×1×205×265 NetCDF contains both `uo` and `vo`, with observed component ranges of approximately -0.872–1.447 and -1.015–1.265 m s-1. Every date produces a strict-JSON 52×67 response with 2,432 finite paired vectors. A deterministic Node test passes for bilinear/coastal vector sampling, out-of-domain rejection, and the 320-particle cap. Live Uvicorn and Vite proxy checks return identical selected dates and grids, invalid time returns HTTP 400, frontend delivery returns HTTP 200, and the production frontend build passes with only the existing non-fatal large-chunk warning.
+
+## Phase 8 — Scientist Data Upload
+
+- **Status:** Complete
+- **Files changed:**
+  - `.gitignore`
+  - `backend/main.py`
+  - `backend/requirements.txt`
+  - `backend/routers/ocean.py`
+  - `backend/services/slicer.py`
+  - `backend/tests/test_upload.py`
+  - `backend/uploads/.gitkeep`
+  - `frontend/src/App.jsx`
+  - `frontend/src/api/client.js`
+  - `frontend/src/components/DatasetUpload.jsx`
+  - `frontend/src/components/HeatmapCanvas.jsx`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `PHASE_LOG.md`
+- **API and storage:** Added multipart `POST /api/upload`. The endpoint accepts one `.nc` file, streams it in 1 MiB chunks with a 100 MiB limit, validates a temporary file, and atomically promotes only a valid dataset to gitignored `backend/uploads/scientist_upload.nc`. A rejected upload leaves the previous valid upload unchanged. CORS now permits POST from the existing local frontend origins, and `python-multipart` is an explicit backend dependency.
+- **NetCDF contract:** The uploaded file must contain numeric `thetao` with dimensions ordered as `(time, depth, latitude, longitude)`, valid non-empty 1-D coordinates, parseable times, strictly increasing finite depth/latitude/longitude coordinates, at least a 2×2 spatial grid, and at least one finite temperature. These requirements match the existing variable-generic slicer and the bundled Copernicus demo schema; validation errors are returned as HTTP 400 with a specific explanation.
+- **Shared slicer:** Existing `GET /api/slice` and `GET /api/layers` now accept `source=demo|upload` and call the same `request_slice`/`request_layers` implementations after selecting the active NetCDF file. Responses include their source. Missing uploaded data returns HTTP 503, while unknown sources return HTTP 400. The existing demo behavior remains the default and is backward compatible.
+- **Frontend:** Added a scientist upload panel with `.nc` file selection, validation/loading status, accepted dataset dimensions, and the required **Demo dataset** / **My upload** choice. A successful upload automatically selects **My upload**; both the 3D depth stack and 2D surface heatmap reload through the source-aware slicer endpoints, and users can switch back to the demo without re-uploading. The Copernicus `uo`/`vo` particle control is disabled for a temperature-only scientist upload so demo currents are not misrepresented as uploaded data.
+- **Deviations from the plan:** The architecture does not define alternate coordinate aliases or an upload schema beyond variable validation and the same slicer. Phase 8 therefore accepts the exact established slicer contract rather than guessing aliases. Uploads support `thetao`; salinity and current-magnitude visualization remain Phase 10 work. The upload is process-global and replaces the previous upload because authentication and per-user storage are not part of Phase 8. No Phase 9 instrument work was added.
+- **Manual test:**
+  1. Install backend dependencies with `uv pip install --python backend/.venv/Scripts/python.exe -r backend/requirements.txt`, start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`, start the frontend with `npm run dev --prefix frontend`, and open `http://localhost:5173`.
+  2. Under **Dataset source**, select `backend/data/copernicus_thetao_india_20260818_20260824.nc` and click **Upload and use**. Confirm the status reports 7 time × 40 depth × 205 latitude × 265 longitude and **My upload** becomes selected.
+  3. Confirm the 3D stack and flat heatmap render the same geography, colors, depths, and dates as the demo. Move the date/depth controls, then switch between **Demo dataset** and **My upload** and confirm both views reload correctly.
+  4. While **My upload** is selected, confirm the surface-current checkbox is disabled with the explanation that currents require the demo `uo`/`vo` dataset. Switch back to **Demo dataset** and confirm Phase 7 currents work normally.
+  5. Try a renamed text file, a NetCDF without `thetao`, or a file larger than 100 MiB. Confirm a specific validation error appears and the previously accepted upload remains selectable and renderable.
+- **Automated validation:** All 16 backend unit tests pass: the original 11 plus five upload tests covering valid ingestion/shared slicing, extension rejection, required-variable rejection with preservation of the prior upload, invalid source rejection, and size-limit enforcement. Python compilation and the frontend production build pass; the build retains only the existing non-fatal large-chunk warning. The explicit architecture acceptance test streamed the real 60,869,823-byte demo file through the upload service and confirmed exact equality between demo and upload slice responses plus all eight depth layers on three dates. A live Uvicorn multipart upload returned the expected 7×40×205×265 metadata, `source=upload` returned 7 times and 8 layers on the 205×265 grid, and an invalid extension returned HTTP 400.
