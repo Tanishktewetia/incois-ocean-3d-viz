@@ -37,7 +37,7 @@ function createOceanScene(
   onInstrumentHover,
 ) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x07131d);
+  scene.background = null;
   scene.add(new THREE.HemisphereLight(0xcceeff, 0x13202a, 2.1));
   const isosurfaceLight = new THREE.DirectionalLight(0xffffff, 2.2);
   isosurfaceLight.position.set(6, -8, 10);
@@ -46,7 +46,7 @@ function createOceanScene(
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   camera.position.set(10, -13, 10);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
@@ -321,7 +321,6 @@ function createOceanScene(
 function OceanScene3D({ dataSource }) {
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
-  const instrumentPanelRef = useRef(null);
   const sceneApiRef = useRef(null);
   const payloadRef = useRef(null);
   const instrumentsRef = useRef([]);
@@ -346,27 +345,36 @@ function OceanScene3D({ dataSource }) {
   const [currentStatus, setCurrentStatus] = useState("off");
   const [interactionMode, setInteractionMode] = useState("rotate");
   const [fullscreenPanel, setFullscreenPanel] = useState(null);
+  const [profileEnlarged, setProfileEnlarged] = useState(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      if (document.fullscreenElement === scenePanelRef.current) setFullscreenPanel("scene");
-      else if (document.fullscreenElement === instrumentPanelRef.current) setFullscreenPanel("profile");
-      else setFullscreenPanel(null);
+      setFullscreenPanel(document.fullscreenElement === scenePanelRef.current ? "scene" : null);
+      sceneApiRef.current?.setInteractionMode(interactionMode);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
+  }, [interactionMode]);
+
+  useEffect(() => {
+    if (!profileEnlarged) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setProfileEnlarged(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [profileEnlarged]);
 
   useEffect(() => {
     sceneApiRef.current?.setInteractionMode(interactionMode);
   }, [interactionMode]);
 
-  const toggleFullscreen = useCallback(async (panel, panelRef) => {
+  const toggleSceneFullscreen = useCallback(async () => {
     try {
-      if (document.fullscreenElement === panelRef.current) await document.exitFullscreen();
-      else await panelRef.current?.requestFullscreen();
+      if (document.fullscreenElement === scenePanelRef.current) await document.exitFullscreen();
+      else await scenePanelRef.current?.requestFullscreen();
     } catch {
-      setControlsError(`Unable to enlarge the ${panel} panel in this browser.`);
+      setControlsError("Unable to enlarge the scene panel in this browser.");
     }
   }, []);
 
@@ -592,12 +600,12 @@ function OceanScene3D({ dataSource }) {
       </aside>
 
       <article ref={scenePanelRef} className={`scene-panel interaction-${interactionMode}`}>
-        <header className="scene-topbar"><div><h2 id="ocean-scene-title">3D {VARIABLE_LABELS[variable]} volume</h2><p>{dataSource === "demo" ? "Copernicus Marine · India EEZ" : "Scientist-uploaded NetCDF"}</p></div><div className="panel-actions"><div className="live-badge"><span />Data linked</div><button className="fullscreen-button" type="button" onClick={() => toggleFullscreen("scene", scenePanelRef)} aria-label={fullscreenPanel === "scene" ? "Exit fullscreen 3D scene" : "View 3D scene fullscreen"} title={fullscreenPanel === "scene" ? "Exit fullscreen" : "View scene fullscreen"}><span aria-hidden="true">{fullscreenPanel === "scene" ? "↙" : "↗"}</span>{fullscreenPanel === "scene" ? "Collapse" : "Enlarge"}</button></div></header>
+        <div className="scene-topbar"><div><h2 id="ocean-scene-title">3D ocean volume</h2><p>Copernicus model layers · instrument markers</p></div><div className="panel-actions"><div className="live-badge"><span />Interactive scene</div><button className="fullscreen-button" type="button" onClick={toggleSceneFullscreen} aria-label={fullscreenPanel === "scene" ? "Exit fullscreen 3D scene" : "View 3D scene fullscreen"} title={fullscreenPanel === "scene" ? "Exit fullscreen" : "View scene fullscreen"}><span aria-hidden="true">{fullscreenPanel === "scene" ? "↙" : "↗"}</span>{fullscreenPanel === "scene" ? "Collapse" : "Enlarge"}</button></div></div>
         <div className="scene-stage">
           <div ref={containerRef} className="scene-container" role="img" aria-label={`Rotatable ${VARIABLE_LABELS[variable].toLowerCase()} stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers`} />
           {(!payload || isUpdating) && !error && <div className="loading-overlay"><div className="loading-content"><div className="loading-ring" /><strong>{payload ? "Updating the water column" : "Building the ocean volume"}</strong><span>Reading real model layers…</span></div></div>}
           {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
-          {payload && <div className="region-map" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><header><span>Region</span><span>Model extent</span></header><div className="region-box"><div className="region-extent" /></div><div className="region-coords"><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E</span><span>{payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div></div>}
+          {payload && <div className="region-caption" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><strong>Model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
           <div className="guided-hint">Click a marker to compare its observed profile with the model. Left drag {interactionMode === "pan" ? "pans" : "rotates"}; scroll zooms.</div>
           {hoveredInstrument && <div role="tooltip" className="scene-tooltip" style={{ borderColor: hoveredInstrument.data_status === "sample" ? "#d47cff" : undefined }}><strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>{hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}<div>{hoveredInstrument.variables.join(", ")}</div></div>}
         </div>
@@ -610,7 +618,8 @@ function OceanScene3D({ dataSource }) {
         {payload && range && <div className="scene-metadata"><span>Selected depth <strong>{payload.layers[selectedDepthIndex].depth.toFixed(0)} m</strong></span><span>Range <strong>{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} {unit}</strong></span><span>Scale <strong>{scale}</strong></span><span>Model date <strong>{payload.time.slice(0, 10)}</strong></span></div>}
       </article>
 
-      <aside ref={instrumentPanelRef} className="instrument-panel" aria-label="Observation comparison"><div className="panel-header"><h3>Observation profile</h3><div className="panel-actions"><span className="step-label">02 · Validate</span><button className="fullscreen-button" type="button" onClick={() => toggleFullscreen("profile", instrumentPanelRef)} aria-label={fullscreenPanel === "profile" ? "Exit fullscreen observation profile" : "View observation profile fullscreen"} title={fullscreenPanel === "profile" ? "Exit fullscreen" : "View profile fullscreen"}><span aria-hidden="true">{fullscreenPanel === "profile" ? "↙" : "↗"}</span>{fullscreenPanel === "profile" ? "Collapse" : "Enlarge"}</button></div></div><div className="instrument-content"><InstrumentOverlay selectedInstrumentId={selectedInstrumentId} onInstrumentsLoaded={handleInstrumentsLoaded} /></div></aside>
+      {profileEnlarged && <button className="profile-window-backdrop" type="button" aria-label="Close enlarged observation profile" onClick={() => setProfileEnlarged(false)} />}
+      <aside className={`instrument-panel ${profileEnlarged ? "profile-enlarged" : ""}`} aria-label="Observation comparison" role={profileEnlarged ? "dialog" : undefined} aria-modal={profileEnlarged ? "true" : undefined}><div className="panel-header"><h3>Observation profile</h3><div className="panel-actions"><span className="step-label">02 · Validate</span><button className="fullscreen-button" type="button" onClick={() => setProfileEnlarged((enlarged) => !enlarged)} aria-label={profileEnlarged ? "Close enlarged observation profile window" : "Enlarge observation profile in a window"} title={profileEnlarged ? "Close enlarged window" : "Enlarge profile window"}><span aria-hidden="true">{profileEnlarged ? "↙" : "↗"}</span>{profileEnlarged ? "Collapse" : "Enlarge"}</button></div></div><div className="instrument-content"><InstrumentOverlay selectedInstrumentId={selectedInstrumentId} onInstrumentsLoaded={handleInstrumentsLoaded} /></div></aside>
     </section>
   );
 }

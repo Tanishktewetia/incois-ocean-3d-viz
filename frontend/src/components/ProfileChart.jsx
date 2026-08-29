@@ -1,7 +1,15 @@
 import { useEffect, useRef } from "react";
 import Chart from "chart.js/auto";
 
-const COLORS = ["#ffb347", "#4fc3f7", "#56d98b", "#d47cff"];
+const OBSERVATION_COLOR = "#d97706";
+const MODEL_COLOR = "#1976d2";
+const SERIES_COLORS = ["#07899d", "#7c3aed", "#15803d", "#be185d"];
+
+function seriesColor(item, index) {
+  if (item.variable.startsWith("model_")) return MODEL_COLOR;
+  if (item.variable === "temperature") return OBSERVATION_COLOR;
+  return SERIES_COLORS[index % SERIES_COLORS.length];
+}
 
 function SeriesChart({ series, sample }) {
   const canvasRef = useRef(null);
@@ -20,11 +28,11 @@ function SeriesChart({ series, sample }) {
             x: measurement.value,
             y: measurement.depth,
           })),
-          borderColor: COLORS[index % COLORS.length],
-          backgroundColor: COLORS[index % COLORS.length],
-          borderWidth: 2,
-          borderDash: item.variable === "model_temperature" ? [6, 4] : [],
-          pointRadius: 0,
+          borderColor: seriesColor(item, index),
+          backgroundColor: seriesColor(item, index),
+          borderWidth: item.variable.startsWith("model_") ? 3 : 2,
+          borderDash: item.variable.startsWith("model_") ? [8, 5] : [],
+          pointRadius: item.variable.startsWith("model_") ? 0 : 2,
           pointHitRadius: 5,
           tension: 0,
         })),
@@ -61,11 +69,17 @@ function SeriesChart({ series, sample }) {
   }, [sample, series]);
 
   return (
-    <div className="chart-wrap">
-      <canvas
-        ref={canvasRef}
-        aria-label={`${sample ? "Sample " : ""}${series.map((item) => item.label).join(" and ")} depth profile`}
-      />
+    <div className="profile-chart-group">
+      <div className="profile-chart-heading">
+        <strong>{series[0].unit} profile</strong>
+        <span>{series.map((item) => item.label).join(" vs ")}</span>
+      </div>
+      <div className="chart-wrap">
+        <canvas
+          ref={canvasRef}
+          aria-label={`${sample ? "Sample " : ""}${series.map((item) => item.label).join(" and ")} depth profile`}
+        />
+      </div>
     </div>
   );
 }

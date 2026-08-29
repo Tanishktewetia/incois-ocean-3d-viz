@@ -389,3 +389,23 @@
   5. Use **Enlarge** on the scene, confirm it fills the viewport and resizes correctly, then use **Collapse** or Escape. Select an instrument, repeat for the observation profile, and confirm its chart grows to the available viewport.
   6. Recheck Core Argo, BGC-Argo, and Glider/CTD profiles to confirm all real labels and the existing **SAMPLE DATA** warnings remain exactly visible.
 - **Automated validation:** All 29 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
+
+## Phase 13 — 3D Viewport and Profile Window UX Correction
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/components/ProfileChart.jsx`
+  - `frontend/src/styles.css`
+  - `PHASE_LOG.md`
+- **Scene interaction:** Kept one mounted WebGL canvas and the same single `OrbitControls` instance in normal and enlarged views. The active Rotate/Pan left-button mapping is now explicitly reapplied on native fullscreen transitions, while the existing container `ResizeObserver` continues to resize that same renderer. Pan retains grab/grabbing feedback; wheel zoom and the existing camera actions are unchanged.
+- **Viewport presentation:** Replaced the flat dark clear color with a transparent WebGL clear over a layered dark-navy CSS gradient, then added a rounded blue-grey frame and restrained inset/drop shadows. This remains intentionally dark for the existing scientific color scales and marker colors; scene objects, materials, geometry, lighting, and camera math were not changed.
+- **Profile enlargement and chart separation:** Observation profiles now enlarge into a bounded in-app window rather than browser fullscreen. The window closes through Collapse, its backdrop, or Escape. Each unit group is presented in its own bordered chart card, with observed temperature shown as a solid amber line with points and model temperature as a thicker dashed blue line; no measurements, grouping, labels, units, or comparison computations changed.
+- **Extent and tooltip clarity:** Replaced the decorative but non-informative region box with a chrome-free single-line model-extent caption. Instrument hover details now use a solid near-white surface, dark high-contrast text, and a stronger shadow while preserving the sample-data warning and marker-specific border accent.
+- **Manual test:**
+  1. Select **Rotate**, left-drag in the normal 3D view, enlarge it, and left-drag again; confirm both orbit the same camera. Repeat with **Pan** and confirm left-drag pans with grab/grabbing cursors in both views. Confirm wheel zoom, Reset, Collapse, and browser Escape still work.
+  2. Confirm the scene viewport has a rounded navy gradient frame rather than a flat black rectangle, while temperature, salinity, currents, isosurfaces, and orange/green/purple markers remain legible.
+  3. Select profiles that produce one and multiple unit charts, click profile **Enlarge**, and confirm a bounded window appears without browser fullscreen. Verify chart cards remain separate, observed/model temperature lines are visually distinct, scrolling works, and Collapse, backdrop click, and Escape close the window.
+  4. Confirm the top-right overlay is a concise `Model extent` coordinate caption with no empty map box. Hover Core Argo, BGC-Argo, and sample Glider/CTD markers and confirm the top-left tooltip is readable and sample records still say `SAMPLE DATA — not live`.
+- **Scope/deviations:** The request allowed either an actual regional graphic or a simplified caption, so the caption option was used to avoid introducing a misleading schematic. No data loading, API calls, scientific calculations, camera-position math, or data-object rendering behavior changed. The renderer's alpha option only exposes the CSS viewport gradient behind the unchanged Three.js scene.
+- **Automated validation:** All 29 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
