@@ -4,6 +4,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { getOceanCurrents, getOceanLayers } from "../api/client.js";
 import InstrumentOverlay from "./InstrumentOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
+import VisualizationControls from "./VisualizationControls.jsx";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
 import {
   createCurrentParticles,
@@ -13,8 +14,26 @@ import {
 const SCENE_HEIGHT = 560;
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
+const VARIABLE_LABELS = {
+  thetao: "Temperature",
+  so: "Salinity",
+  current_magnitude: "Current magnitude",
+};
 
-function createOceanScene(container, payload, range, onInstrumentSelect, onInstrumentHover) {
+function displayUnit(payload) {
+  return payload?.variable === "so" ? "PSU" : payload?.unit || "";
+}
+
+function createOceanScene(
+  container,
+  payload,
+  range,
+  scale,
+  opacity,
+  verticalExaggeration,
+  onInstrumentSelect,
+  onInstrumentHover,
+) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07131d);
 
@@ -68,6 +87,7 @@ function createOceanScene(container, payload, range, onInstrumentSelect, onInstr
       layer.values,
       range.minimum,
       range.maximum,
+      { scale },
     );
     const texture = new THREE.DataTexture(
       pixels,
@@ -83,7 +103,7 @@ function createOceanScene(container, payload, range, onInstrumentSelect, onInstr
 
     const material = new THREE.MeshBasicMaterial({
       map: texture,
-      opacity: 0.76,
+      opacity,
       side: THREE.DoubleSide,
       transparent: true,
     });
@@ -103,6 +123,18 @@ function createOceanScene(container, payload, range, onInstrumentSelect, onInstr
     new THREE.LineBasicMaterial({ color: 0x7da6bd, transparent: true, opacity: 0.45 }),
   );
   scene.add(frame);
+  let selectedDepthIndex = 0;
+  let layerOpacity = opacity;
+
+  function positionDepthLayers(exaggeration) {
+    planes.forEach((plane, index) => {
+      plane.position.z = STACK_HEIGHT / 2
+        - (payload.layers[index].depth / maximumDepth) * STACK_HEIGHT * exaggeration;
+    });
+    frame.scale.z = exaggeration;
+    frame.position.z = STACK_HEIGHT / 2 - (STACK_HEIGHT * exaggeration) / 2;
+  }
+  positionDepthLayers(verticalExaggeration);
 
   function handlePointerClick(event) {
     const bounds = renderer.domElement.getBoundingClientRect();
@@ -184,20 +216,36 @@ function createOceanScene(container, payload, range, onInstrumentSelect, onInstr
         marker.scale.setScalar(selected ? 1.65 : 1);
       });
     },
-    updateLayers(nextPayload, nextRange) {
+    updateLayers(nextPayload, nextRange, nextScale) {
       nextPayload.layers.forEach((layer, index) => {
         const pixels = createColorBuffer(
           layer.values,
           nextRange.minimum,
           nextRange.maximum,
+          { scale: nextScale },
         );
         textures[index].image.data.set(pixels);
         textures[index].needsUpdate = true;
       });
     },
-    highlightDepth(selectedIndex) {
+    setOpacity(nextOpacity) {
+      layerOpacity = nextOpacity;
       materials.forEach((material, index) => {
-        material.opacity = index === selectedIndex ? 0.96 : 0.28;
+        material.opacity = index === selectedDepthIndex
+          ? layerOpacity
+          : layerOpacity * 0.3;
+        material.needsUpdate = true;
+      });
+    },
+    setVerticalExaggeration(exaggeration) {
+      positionDepthLayers(exaggeration);
+    },
+    highlightDepth(selectedIndex) {
+      selectedDepthIndex = selectedIndex;
+      materials.forEach((material, index) => {
+        material.opacity = index === selectedIndex
+          ? layerOpacity
+          : layerOpacity * 0.3;
         material.depthWrite = index === selectedIndex;
         material.needsUpdate = true;
       });
@@ -233,6 +281,11 @@ function OceanScene3D({ dataSource }) {
   const instrumentsRef = useRef([]);
   const [payload, setPayload] = useState(null);
   const [range, setRange] = useState(null);
+  const [variable, setVariable] = useState("thetao");
+  const [scale, setScale] = useState("linear");
+  const [opacity, setOpacity] = useState(0.9);
+  const [verticalExaggeration, setVerticalExaggeration] = useState(1);
+  const [controlsError, setControlsError] = useState("");
   const [times, setTimes] = useState([]);
   const [selectedDepthIndex, setSelectedDepthIndex] = useState(0);
   const [selectedTimeIndex, setSelectedTimeIndex] = useState(null);
@@ -247,9 +300,11 @@ function OceanScene3D({ dataSource }) {
   useEffect(() => {
     const controller = new AbortController();
 
+    payloadRef.current = null;
     setError("");
+    setIsUpdating(true);
     getOceanLayers({
-      variable: "thetao",
+      variable,
       source: dataSource,
       signal: controller.signal,
     })
@@ -257,6 +312,7 @@ function OceanScene3D({ dataSource }) {
         payloadRef.current = layersPayload;
         setPayload(layersPayload);
         setRange(getFiniteRange(layersPayload.layers.map((layer) => layer.values)));
+        setScale("linear");
         setTimes(layersPayload.times);
         setSelectedTimeIndex(layersPayload.times.indexOf(layersPayload.time));
         setSelectedDepthIndex(0);
@@ -265,10 +321,15 @@ function OceanScene3D({ dataSource }) {
         if (requestError.name !== "AbortError") {
           setError("Unable to load the 3D ocean depth layers.");
         }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setIsUpdating(false);
+        }
       });
 
     return () => controller.abort();
-  }, [dataSource]);
+  }, [dataSource, variable]);
 
   useEffect(() => {
     if (!containerRef.current || !payload || !range) {
@@ -280,14 +341,18 @@ function OceanScene3D({ dataSource }) {
         containerRef.current,
         payload,
         range,
+        scale,
+        opacity,
+        verticalExaggeration,
         setSelectedInstrumentId,
         setHoveredInstrument,
       );
       sceneApiRef.current.setInstruments(instrumentsRef.current);
+      sceneApiRef.current.highlightDepth(selectedDepthIndex);
     } else {
-      sceneApiRef.current.updateLayers(payload, range);
+      sceneApiRef.current.updateLayers(payload, range, scale);
     }
-  }, [payload, range]);
+  }, [payload, range, scale]);
 
   useEffect(() => () => {
     sceneApiRef.current?.dispose();
@@ -299,6 +364,14 @@ function OceanScene3D({ dataSource }) {
   }, [selectedDepthIndex]);
 
   useEffect(() => {
+    sceneApiRef.current?.setOpacity(opacity);
+  }, [opacity]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setVerticalExaggeration(verticalExaggeration);
+  }, [verticalExaggeration]);
+
+  useEffect(() => {
     sceneApiRef.current?.selectInstrument(selectedInstrumentId);
   }, [selectedInstrumentId]);
 
@@ -308,7 +381,7 @@ function OceanScene3D({ dataSource }) {
     }
 
     const requestedTime = times[selectedTimeIndex];
-    if (payloadRef.current?.source !== dataSource) {
+    if (payloadRef.current?.source !== dataSource || payloadRef.current?.variable !== variable) {
       return undefined;
     }
     if (payloadRef.current?.time === requestedTime) {
@@ -320,7 +393,7 @@ function OceanScene3D({ dataSource }) {
     setError("");
 
     getOceanLayers({
-      variable: "thetao",
+      variable,
       time: requestedTime,
       source: dataSource,
       signal: controller.signal,
@@ -328,7 +401,6 @@ function OceanScene3D({ dataSource }) {
       .then((layersPayload) => {
         payloadRef.current = layersPayload;
         setPayload(layersPayload);
-        setRange(getFiniteRange(layersPayload.layers.map((layer) => layer.values)));
       })
       .catch((requestError) => {
         if (requestError.name !== "AbortError") {
@@ -342,10 +414,11 @@ function OceanScene3D({ dataSource }) {
       });
 
     return () => controller.abort();
-  }, [dataSource, selectedTimeIndex, times]);
+  }, [dataSource, selectedTimeIndex, times, variable]);
 
   useEffect(() => {
     if (dataSource === "upload") {
+      setVariable("thetao");
       setParticlesEnabled(false);
       sceneApiRef.current?.setParticlesVisible(false);
     }
@@ -390,10 +463,56 @@ function OceanScene3D({ dataSource }) {
     sceneApiRef.current?.setInstruments(instruments);
   }, []);
 
+  const handleRangeChange = useCallback((boundary, value) => {
+    if (value === "") {
+      setControlsError("Colorbar bounds must be numbers.");
+      return;
+    }
+    const numericValue = Number(value);
+    const nextRange = { ...range, [boundary]: numericValue };
+    if (!Number.isFinite(numericValue) || nextRange.minimum >= nextRange.maximum) {
+      setControlsError("Colorbar minimum must be less than its maximum.");
+      return;
+    }
+    if (scale === "log" && nextRange.minimum <= 0) {
+      setControlsError("Logarithmic color scale requires a minimum greater than zero.");
+      return;
+    }
+    setControlsError("");
+    setRange(nextRange);
+  }, [range, scale]);
+
+  const handleScaleChange = useCallback((nextScale) => {
+    if (nextScale === "log" && range.minimum <= 0) {
+      setControlsError("Logarithmic color scale requires a minimum greater than zero.");
+      return;
+    }
+    setControlsError("");
+    setScale(nextScale);
+  }, [range]);
+
   return (
     <section aria-labelledby="ocean-scene-title">
-      <h2 id="ocean-scene-title">3D temperature depth stack</h2>
+      <h2 id="ocean-scene-title">3D {VARIABLE_LABELS[variable].toLowerCase()} depth stack</h2>
       <p>Drag to rotate · Scroll to zoom</p>
+      {range && (
+        <VisualizationControls
+          variable={variable}
+          onVariableChange={setVariable}
+          minimum={range.minimum}
+          maximum={range.maximum}
+          unit={displayUnit(payload)}
+          onRangeChange={handleRangeChange}
+          scale={scale}
+          onScaleChange={handleScaleChange}
+          opacity={opacity}
+          onOpacityChange={setOpacity}
+          verticalExaggeration={verticalExaggeration}
+          onVerticalExaggerationChange={setVerticalExaggeration}
+          uploadSelected={dataSource === "upload"}
+          error={controlsError}
+        />
+      )}
       {!payload && !error && <p>Loading eight Copernicus Marine depth layers…</p>}
       {error && <p role="alert">{error}</p>}
       {payload && selectedTimeIndex !== null && (
@@ -443,7 +562,7 @@ function OceanScene3D({ dataSource }) {
         <div
           ref={containerRef}
           role="img"
-          aria-label="Rotatable temperature stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers"
+          aria-label={`Rotatable ${VARIABLE_LABELS[variable].toLowerCase()} stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers`}
           style={{
             display: payload ? "block" : "none",
             width: "100%",
@@ -475,10 +594,11 @@ function OceanScene3D({ dataSource }) {
       {payload && range && (
         <p>
           Depths: {payload.layers.map((layer) => layer.depth.toFixed(0)).join(", ")} m
-          {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
+          {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} {displayUnit(payload)}
+          {" · "}{scale === "log" ? "Logarithmic" : "Linear"} color scale
           {" · Selected: "}{payload.layers[selectedDepthIndex].depth.toFixed(0)} m
           {" · "}{payload.time.slice(0, 10)}
-          {" · "}{payload.source === "demo" ? "Copernicus Marine temperature data (India EEZ)" : "My upload"}
+          {" · "}{payload.source === "demo" ? `Copernicus Marine ${VARIABLE_LABELS[variable].toLowerCase()} data (India EEZ)` : "My upload"}
         </p>
       )}
       <InstrumentOverlay

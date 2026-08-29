@@ -265,3 +265,29 @@
   4. Click an orange Core Argo circle and confirm its observed/model temperature chart and RMSE appear. Click green BGC-Argo diamonds and confirm the selected float shows its available chlorophyll-a and/or dissolved-oxygen depth chart with Argo GDAC provenance.
   5. Rotate/zoom the scene, change model depth/date, and toggle currents. Confirm all instrument markers remain selectable and existing ocean/current controls still work.
 - **Automated validation:** All 19 backend unit tests pass, including adjusted BGC-value preference, QC filtering, normalized sample schema, and explicit sample labels. Python compilation and `git diff --check` pass. The production frontend build passes with only the existing non-fatal large-chunk warning. A live Uvicorn smoke test returned HTTP 200 for health, the 50-record instrument catalog, a real BGC chlorophyll/oxygen profile, and a sample Glider profile whose API status/source explicitly identify it as sample and not live.
+
+## Phase 10 — Variable & Colorbar Controls
+
+- **Status:** Complete
+- **Files changed:**
+  - `backend/services/slicer.py`
+  - `backend/tests/test_variables.py`
+  - `frontend/src/components/DatasetUpload.jsx`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/components/VisualizationControls.jsx`
+  - `frontend/src/utils/colorScale.js`
+  - `PHASE_LOG.md`
+- **Model data:** Added real Copernicus Marine `GLOBAL_ANALYSISFORECAST_PHY_001_024` daily-mean salinity (`so`) and full-depth current (`uo`/`vo`) subsets for the established India EEZ box (68–90°E, 5–22°N), 2026-08-18 through 2026-08-24, and all 40 model levels from 0.494 m through 1941.893 m. Current magnitude is derived as `sqrt(uo² + vo²)` and is not fabricated. The files are intentionally gitignored:
+  - `backend/data/copernicus_so_india_20260818_20260824.nc` — 60,869,823 bytes; SHA-256 `FCF8C0B4B081B4D8A74B7577E2F07DA58D53C34E2C6B6B08AC6BE2AC8EEC581E`.
+  - `backend/data/copernicus_currents_3d_india_20260818_20260824.nc` — 121,717,148 bytes; SHA-256 `12A0E56CE8D7BEAB0CA3EE8D23DDB4D4357AE0601FD9C40B29A99ECE267FE2D8`.
+- **Backend:** Generalized the existing `/api/slice` and `/api/layers` contracts to support `thetao`, `so`, and `current_magnitude`. Temperature and salinity use their scalar model files; current speed is calculated from paired finite `uo`/`vo` fields. The existing lightweight surface-current endpoint remains unchanged for particle animation.
+- **Frontend:** Added a variable selector, labelled colorbar with editable minimum/maximum, linear/logarithmic scale selector, layer-opacity slider, and 0.5×–4× vertical-exaggeration slider. Range and scale changes recolor the existing Three.js textures immediately; opacity preserves selected-depth emphasis; exaggeration stretches model depth while keeping the sea surface and instrument markers fixed. Labels, units, scene heading, accessibility text, and provenance update with the selected variable.
+- **Deviations from the plan:** The architecture names “current magnitude” but does not prescribe an API identifier, so the implementation uses `current_magnitude`. Log mode rejects a non-positive colorbar minimum because logarithms are undefined there. Phase 8’s upload contract remains deliberately temperature-only; salinity/current options are disabled for **My upload** rather than implying unavailable variables exist. The salinity API preserves the source CF unit `1e-3`, while the UI displays its human-readable Copernicus unit as PSU. No Phase 11 isosurface work was added.
+- **Manual test:**
+  1. Ensure the three gitignored full-depth files for `thetao`, `so`, and `uo`/`vo` exist in `backend/data/`. Start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`, start the frontend with `npm run dev --prefix frontend`, and open `http://localhost:5173`.
+  2. Select **Temperature**, **Salinity**, and **Current magnitude** in turn. Confirm the heading, units/colorbar, values, and layer colors change; salinity is labelled PSU and current speed `m s-1`.
+  3. Edit the color minimum and maximum and confirm clipping/contrast changes immediately. Select **Logarithmic** and confirm the color distribution changes; confirm a zero/negative minimum is rejected with an inline explanation.
+  4. Move **Layer opacity** from 5% to 100% and confirm all layers fade/strengthen while the selected layer remains emphasized. Move **Vertical exaggeration** from 0.5× to 4× and confirm the depth stack/frame visibly compresses/stretches while surface instrument markers remain at the surface.
+  5. Change depth and date for each variable, rotate/zoom the scene, and enable current particles. Confirm existing depth/time, instrument selection, and real current animation controls still work.
+  6. Select **My upload** after uploading a valid Phase 8 temperature NetCDF. Confirm the variable returns to **Temperature** and salinity/current-magnitude choices are disabled and explained.
+- **Automated validation:** All 23 backend unit tests pass, including real-variable routing, exact 3-4-5 current-magnitude derivation, unsupported-variable errors, and temperature-only upload enforcement. Python compilation and `git diff --check` pass. The frontend production build passes with only the existing non-fatal large-chunk warning. Direct real-file smoke checks returned eight layers for all three variables with plausible ranges. A live Uvicorn smoke test returned HTTP 200 for `thetao`, `so`, and `current_magnitude` at the requested date, and HTTP 400 for unsupported upload salinity.

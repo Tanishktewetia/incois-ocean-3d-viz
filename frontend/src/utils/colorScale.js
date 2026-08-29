@@ -29,8 +29,23 @@ export function getFiniteRange(grids) {
   return { minimum, maximum };
 }
 
-export function interpolateColor(value, minimum, maximum) {
-  const normalized = maximum === minimum ? 0.5 : (value - minimum) / (maximum - minimum);
+export function transformValue(value, scale = "linear") {
+  if (scale === "log") {
+    return value > 0 ? Math.log10(value) : null;
+  }
+  return value;
+}
+
+export function interpolateColor(value, minimum, maximum, scale = "linear") {
+  const transformedValue = transformValue(value, scale);
+  const transformedMinimum = transformValue(minimum, scale);
+  const transformedMaximum = transformValue(maximum, scale);
+  if (transformedValue === null || transformedMinimum === null || transformedMaximum === null) {
+    return LAND_COLOR.slice(0, 3);
+  }
+  const normalized = transformedMaximum === transformedMinimum
+    ? 0.5
+    : (transformedValue - transformedMinimum) / (transformedMaximum - transformedMinimum);
   const position = Math.min(1, Math.max(0, normalized)) * (COLOR_STOPS.length - 1);
   const lowerIndex = Math.min(Math.floor(position), COLOR_STOPS.length - 2);
   const amount = position - lowerIndex;
@@ -42,7 +57,12 @@ export function interpolateColor(value, minimum, maximum) {
   );
 }
 
-export function createColorBuffer(values, minimum, maximum, { flipRows = false } = {}) {
+export function createColorBuffer(
+  values,
+  minimum,
+  maximum,
+  { flipRows = false, scale = "linear" } = {},
+) {
   const height = values.length;
   const width = values[0].length;
   const pixels = new Uint8Array(width * height * 4);
@@ -54,7 +74,7 @@ export function createColorBuffer(values, minimum, maximum, { flipRows = false }
       const value = values[sourceRow][column];
       const color = value === null
         ? LAND_COLOR
-        : [...interpolateColor(value, minimum, maximum), 255];
+        : [...interpolateColor(value, minimum, maximum, scale), 255];
       pixels.set(color, (targetRow * width + column) * 4);
     }
   }
