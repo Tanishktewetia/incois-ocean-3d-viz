@@ -62,10 +62,9 @@ function App() {
           </div>
           <p className="intro-copy">Explore real Copernicus Marine forecasts and in-situ observations across the India EEZ in one scientifically traceable 3D workspace.</p>
         </section>
-        <OceanScene3D dataSource={dataSource} />
-        <section className="data-lab" aria-labelledby="data-lab-title">
+        <section className="data-lab data-lab-featured" aria-labelledby="data-lab-title">
           <div className="section-heading">
-            <div><p className="eyebrow">Data lab</p><h2 id="data-lab-title">Bring your own ocean model</h2></div>
+            <div><p className="eyebrow">Data lab · Primary workflow</p><h2 id="data-lab-title">Bring your own ocean model</h2></div>
             <p>Validate a scientist-supplied NetCDF dataset in the same visual workflow, or inspect the source surface grid.</p>
           </div>
           <div className="data-lab-grid">
@@ -81,6 +80,7 @@ function App() {
             <HeatmapCanvas dataSource={dataSource} />
           </div>
         </section>
+        <OceanScene3D dataSource={dataSource} />
       </main>
       <footer><span>OceanScope · SIH PS 26067</span><span>Built on traceable ocean data, not invented terrain.</span></footer>
     </div>

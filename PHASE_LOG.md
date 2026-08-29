@@ -409,3 +409,23 @@
   4. Confirm the top-right overlay is a concise `Model extent` coordinate caption with no empty map box. Hover Core Argo, BGC-Argo, and sample Glider/CTD markers and confirm the top-left tooltip is readable and sample records still say `SAMPLE DATA — not live`.
 - **Scope/deviations:** The request allowed either an actual regional graphic or a simplified caption, so the caption option was used to avoid introducing a misleading schematic. No data loading, API calls, scientific calculations, camera-position math, or data-object rendering behavior changed. The renderer's alpha option only exposes the CSS viewport gradient behind the unchanged Three.js scene.
 - **Automated validation:** All 29 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
+
+## Phase 13 — Standard Pan and Workspace Priority Correction
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/App.jsx`
+  - `frontend/src/styles.css`
+  - `PHASE_LOG.md`
+- **Standard scene interaction:** Removed the Rotate/Pan left-click mode state and restored the established `OrbitControls` mapping: left drag rotates, middle drag pans, and the wheel zooms. Rotate and Pan remain available as one-click camera nudges rather than persistent modes. Canvas-scoped non-passive middle-button handlers prevent browser autoscroll/default middle-click behavior, while scene-only overscroll containment avoids affecting normal scrolling elsewhere on the page.
+- **Single scene frame:** Removed the inner scene-stage margin, border, radius, and shadow so the scene panel provides one clean outer frame. The dark navy viewport gradient remains directly inside that frame; no WebGL scene objects, geometry, materials, lighting, or renderer data behavior changed.
+- **Balanced workspace:** Increased the Explorer width ceiling and rebalanced the wide three-column grid to approximately 18% controls, 51% 3D scene, and 31% observation profile, with a 390 px profile minimum. Existing two-column behavior at 1500 px and stacked mobile behavior remain intact.
+- **Prominent Data Lab:** Moved the existing upload and source-grid workflow directly below the Explorer introduction and before the main workspace. Added a clearly elevated, primary-workflow visual container without changing upload state, API calls, validation, or heatmap behavior.
+- **Scope/deviations:** No data loading, scientific computations, API contracts/calls, Three.js scene-object rendering, or camera math changed. No dependencies were added.
+- **Manual test:**
+  1. In the 3D canvas, confirm left drag rotates, middle-button drag pans without triggering the browser autoscroll icon or moving the page, and wheel input zooms. Move outside the canvas and confirm the page still scrolls normally. Confirm Rotate/Pan buttons perform one camera nudge and Reset restores the default view.
+  2. Confirm the scene has one clean outer panel border with no inset second frame around the navy viewport, in both normal and enlarged views.
+  3. At widths above 1500 px, confirm the profile panel is a substantial third column and its charts are readily readable beside controls and scene. At 1500 px and below, confirm the profile moves below the control/scene pair; below 900 px, confirm all panels stack without horizontal overflow.
+  4. Confirm Data Lab appears immediately below the page introduction, reads as a primary workflow, and still switches between demo and uploaded NetCDF sources, uploads a valid file, reports validation feedback, and updates the source-grid preview.
+- **Automated validation:** Frontend production build, backend test suite, Python byte-compilation, and `git diff --check` pass. Vite's existing non-fatal large-chunk advisory remains.

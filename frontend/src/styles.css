@@ -50,14 +50,14 @@ p { color: var(--muted); line-height: 1.65; }
 .connection-pill span { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 10px rgba(255,141,145,.5); }
 .connection-pill.connected span { background: #62e6a4; box-shadow: 0 0 10px rgba(98,230,164,.6); }
 
-.explorer-page { padding: 36px clamp(18px, 3vw, 52px) 64px; max-width: 1920px; margin: auto; }
+.explorer-page { padding: 36px clamp(18px, 3vw, 52px) 64px; max-width: 2160px; margin: auto; }
 .page-intro { display: flex; justify-content: space-between; align-items: end; gap: 40px; margin-bottom: 30px; }
 .page-intro h1, .about-hero h1 { margin: 6px 0 0; font-size: clamp(32px, 4vw, 60px); line-height: 1.02; font-weight: 600; }
 .page-intro h1 span, .about-hero h1 span { color: var(--cyan-soft); }
 .eyebrow { margin-bottom: 8px; color: var(--cyan); font-size: .75rem; font-weight: 700; letter-spacing: .17em; text-transform: uppercase; }
 .intro-copy { width: min(430px, 40vw); margin: 0; font-size: 1rem; }
 
-.ocean-workspace { display: grid; grid-template-columns: 286px minmax(500px, 1fr) minmax(300px, 380px); gap: 14px; align-items: start; }
+.ocean-workspace { display: grid; grid-template-columns: minmax(270px, .72fr) minmax(560px, 2fr) minmax(390px, 1.22fr); gap: 18px; align-items: start; }
 .control-sidebar, .scene-panel, .instrument-panel, .data-card { border: 1px solid var(--line); background: linear-gradient(145deg, rgba(14, 29, 40, .96), rgba(7, 17, 25, .96)); box-shadow: var(--shadow); }
 .control-sidebar { border-radius: var(--radius); overflow: hidden; position: sticky; top: 88px; }
 .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 18px; border-bottom: 1px solid var(--line); }
@@ -108,8 +108,8 @@ input[type="range"] { width: 100%; height: 3px; margin: 7px 0; accent-color: var
 .scene-topbar p { margin: 0; font-size: .6875rem; line-height: 1.2; }
 .live-badge { display: flex; align-items: center; gap: 7px; color: #a8bbc2; font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; }
 .live-badge span { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 9px var(--cyan); }
-.scene-stage { position: relative; min-height: clamp(520px, 67vh, 760px); margin: 10px; border: 1px solid #23465d; border-radius: 13px; background: linear-gradient(145deg, #102b40 0%, #071a2b 48%, #030d18 100%); overflow: hidden; box-shadow: inset 0 0 0 1px rgba(132, 194, 219, .06), 0 8px 22px rgba(15, 50, 72, .14); }
-.scene-container { position: absolute; inset: 0; width: 100%; overflow: hidden; background: radial-gradient(circle at 28% 18%, rgba(38, 92, 122, .35), transparent 38%), linear-gradient(145deg, #102b40 0%, #071a2b 48%, #030d18 100%); }
+.scene-stage { position: relative; min-height: clamp(520px, 67vh, 760px); background: linear-gradient(145deg, #102b40 0%, #071a2b 48%, #030d18 100%); overflow: hidden; overscroll-behavior: contain; }
+.scene-container { position: absolute; inset: 0; width: 100%; overflow: hidden; background: radial-gradient(circle at 28% 18%, rgba(38, 92, 122, .35), transparent 38%), linear-gradient(145deg, #102b40 0%, #071a2b 48%, #030d18 100%); overscroll-behavior: contain; }
 .scene-container canvas { display: block; touch-action: none; }
 .loading-overlay { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; background: rgba(5,13,20,.87); backdrop-filter: blur(5px); }
 .loading-content { text-align: center; }
@@ -153,6 +153,8 @@ input[type="range"] { width: 100%; height: 3px; margin: 7px 0; accent-color: var
 .empty-profile p { margin: 0; font-size: .75rem; }
 
 .data-lab { margin-top: 54px; }
+.data-lab-featured { margin: 0 0 30px; padding: clamp(22px, 2.5vw, 34px); border: 1px solid #a9d6dd; border-radius: calc(var(--radius) + 2px); background: linear-gradient(125deg, #eefafb 0%, #fff 58%, #f2f8fb 100%); box-shadow: 0 16px 38px rgba(25, 72, 96, .1); }
+.data-lab-featured .section-heading { padding-bottom: 18px; border-bottom: 1px solid #cfe5ea; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 30px; margin-bottom: 20px; }
 .section-heading h2 { margin: 0; font-size: clamp(23px, 2.6vw, 36px); }
 .section-heading > p { width: min(440px, 45%); margin: 0; font-size: .9375rem; }
@@ -261,7 +263,7 @@ body { background: radial-gradient(circle at 72% 0%, rgba(43,174,191,.11), trans
 .connection-pill span { background: #d94c5c; }
 .connection-pill.connected span { background: #22a66f; }
 .page-intro h1 span, .about-hero h1 span { color: var(--cyan); }
-.ocean-workspace { grid-template-columns: minmax(270px,300px) minmax(540px,1fr) minmax(310px,380px); gap: 18px; }
+.ocean-workspace { grid-template-columns: minmax(270px, .72fr) minmax(560px, 2fr) minmax(390px, 1.22fr); gap: 18px; }
 .control-sidebar, .scene-panel, .instrument-panel, .data-card { border-color: var(--line); background: var(--surface); box-shadow: var(--shadow); }
 .control-sidebar { top: 88px; max-height: calc(100vh - 104px); overflow-y: auto; scrollbar-width: thin; scrollbar-color: #b7d3dd transparent; }
 .panel-header, .scene-topbar, .scene-toolbar { background: #f8fbfd; }
@@ -294,12 +296,10 @@ body { background: radial-gradient(circle at 72% 0%, rgba(43,174,191,.11), trans
 .instrument-panel.profile-enlarged .profile-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
 .instrument-panel.profile-enlarged .profile-card > :not(.profile-chart-group) { grid-column: 1 / -1; }
 .instrument-panel.profile-enlarged .chart-wrap { height: min(48vh, 560px); }
-.scene-container canvas { cursor: default; }
-.interaction-pan .scene-container canvas { cursor: grab; }
-.interaction-pan .scene-container canvas:active { cursor: grabbing; }
+.scene-container canvas { cursor: grab; }
+.scene-container canvas:active { cursor: grabbing; }
 .camera-button { border-color: #cddde5; background: #fff; color: #496477; }
 .camera-button:hover { border-color: var(--line-strong); color: #075f70; background: #edf9fa; }
-.camera-button.active { border-color: var(--cyan); background: #dff5f7; color: #075f70; box-shadow: inset 0 0 0 1px rgba(7,137,157,.08); }
 .scene-metadata { background: #fff; color: #607789; }
 .scene-metadata strong { color: #294b60; }
 .live-badge { color: #587184; }

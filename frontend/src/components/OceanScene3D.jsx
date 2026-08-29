@@ -58,6 +58,12 @@ function createOceanScene(
   controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
   controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
   controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+  const preventMiddleMouseDefault = (event) => {
+    if (event.button === 1) event.preventDefault();
+  };
+  renderer.domElement.addEventListener("pointerdown", preventMiddleMouseDefault, { passive: false });
+  renderer.domElement.addEventListener("mousedown", preventMiddleMouseDefault, { passive: false });
+  renderer.domElement.addEventListener("auxclick", preventMiddleMouseDefault);
   const initialCameraPosition = camera.position.clone();
   const initialTarget = controls.target.clone();
 
@@ -211,9 +217,6 @@ function createOceanScene(
       }
       controls.update();
     },
-    setInteractionMode(mode) {
-      controls.mouseButtons.LEFT = mode === "pan" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
-    },
     setCurrentField(field) {
       currentParticles.setField(field);
     },
@@ -300,6 +303,9 @@ function createOceanScene(
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("click", handlePointerClick);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
+      renderer.domElement.removeEventListener("pointerdown", preventMiddleMouseDefault);
+      renderer.domElement.removeEventListener("mousedown", preventMiddleMouseDefault);
+      renderer.domElement.removeEventListener("auxclick", preventMiddleMouseDefault);
       resizeObserver.disconnect();
       controls.dispose();
       Object.values(markerGeometries).forEach((value) => value.dispose());
@@ -343,18 +349,16 @@ function OceanScene3D({ dataSource }) {
   const [particlesEnabled, setParticlesEnabled] = useState(false);
   const [currentField, setCurrentField] = useState(null);
   const [currentStatus, setCurrentStatus] = useState("off");
-  const [interactionMode, setInteractionMode] = useState("rotate");
   const [fullscreenPanel, setFullscreenPanel] = useState(null);
   const [profileEnlarged, setProfileEnlarged] = useState(false);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
       setFullscreenPanel(document.fullscreenElement === scenePanelRef.current ? "scene" : null);
-      sceneApiRef.current?.setInteractionMode(interactionMode);
     };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, [interactionMode]);
+  }, []);
 
   useEffect(() => {
     if (!profileEnlarged) return undefined;
@@ -364,10 +368,6 @@ function OceanScene3D({ dataSource }) {
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [profileEnlarged]);
-
-  useEffect(() => {
-    sceneApiRef.current?.setInteractionMode(interactionMode);
-  }, [interactionMode]);
 
   const toggleSceneFullscreen = useCallback(async () => {
     try {
@@ -432,7 +432,6 @@ function OceanScene3D({ dataSource }) {
         setSelectedInstrumentId,
         setHoveredInstrument,
       );
-      sceneApiRef.current.setInteractionMode(interactionMode);
       sceneApiRef.current.setInstruments(instrumentsRef.current);
       sceneApiRef.current.highlightDepth(selectedDepthIndex);
     } else {
@@ -599,19 +598,19 @@ function OceanScene3D({ dataSource }) {
         {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p></section>}
       </aside>
 
-      <article ref={scenePanelRef} className={`scene-panel interaction-${interactionMode}`}>
+      <article ref={scenePanelRef} className="scene-panel">
         <div className="scene-topbar"><div><h2 id="ocean-scene-title">3D ocean volume</h2><p>Copernicus model layers · instrument markers</p></div><div className="panel-actions"><div className="live-badge"><span />Interactive scene</div><button className="fullscreen-button" type="button" onClick={toggleSceneFullscreen} aria-label={fullscreenPanel === "scene" ? "Exit fullscreen 3D scene" : "View 3D scene fullscreen"} title={fullscreenPanel === "scene" ? "Exit fullscreen" : "View scene fullscreen"}><span aria-hidden="true">{fullscreenPanel === "scene" ? "↙" : "↗"}</span>{fullscreenPanel === "scene" ? "Collapse" : "Enlarge"}</button></div></div>
         <div className="scene-stage">
           <div ref={containerRef} className="scene-container" role="img" aria-label={`Rotatable ${VARIABLE_LABELS[variable].toLowerCase()} stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers`} />
           {(!payload || isUpdating) && !error && <div className="loading-overlay"><div className="loading-content"><div className="loading-ring" /><strong>{payload ? "Updating the water column" : "Building the ocean volume"}</strong><span>Reading real model layers…</span></div></div>}
           {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
           {payload && <div className="region-caption" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><strong>Model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
-          <div className="guided-hint">Click a marker to compare its observed profile with the model. Left drag {interactionMode === "pan" ? "pans" : "rotates"}; scroll zooms.</div>
+          <div className="guided-hint">Click a marker to compare its observed profile with the model. Left drag rotates; middle drag pans; scroll zooms.</div>
           {hoveredInstrument && <div role="tooltip" className="scene-tooltip" style={{ borderColor: hoveredInstrument.data_status === "sample" ? "#d47cff" : undefined }}><strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>{hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}<div>{hoveredInstrument.variables.join(", ")}</div></div>}
         </div>
         <div className="scene-toolbar" aria-label="3D camera controls">
-          <button className={`camera-button ${interactionMode === "rotate" ? "active" : ""}`} type="button" onClick={() => setInteractionMode("rotate")} title="Use left-click drag to rotate" aria-pressed={interactionMode === "rotate"}><span aria-hidden="true">↻</span>Rotate</button>
-          <button className={`camera-button ${interactionMode === "pan" ? "active" : ""}`} type="button" onClick={() => setInteractionMode("pan")} title="Use left-click drag to pan" aria-pressed={interactionMode === "pan"}><span aria-hidden="true">↔</span>Pan</button>
+          <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("rotate")} title="Rotate the camera around the data; left-mouse drag rotates freely"><span aria-hidden="true">↻</span>Rotate</button>
+          <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("pan")} title="Pan right; middle-mouse drag pans freely"><span aria-hidden="true">↔</span>Pan</button>
           <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("zoom")} title="Zoom closer; the scroll wheel also zooms"><span aria-hidden="true">＋</span>Zoom</button>
           <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("reset")} title="Reset the camera to the default view"><span aria-hidden="true">⌂</span>Reset</button>
         </div>
