@@ -290,6 +290,74 @@ re-upload the demo file, scene renders identically to the cached path.
 
 Also write `README.md` and `DEMO_SCRIPT.md`.
 
+### Phase 14 — Comparison & Justification Page (researched, cited)
+A dedicated section/page proving, with real documentation, why OceanScope
+is a genuine improvement over the three tools scientists use today. Every
+factual claim on this page must trace to one of the sources below or be
+flagged for the user to verify — no invented statistics, no unverified
+claims. This phase must not proceed on assumptions; the research below
+was gathered from each tool's own documentation.
+
+**Ferret (NOAA PMEL)**
+- Command-line/scriptable environment, development began 1985.
+  Source: https://ferret.pmel.noaa.gov/static/Documentation/rostock_paper/paper.html
+- Primary format is NetCDF; can also ingest ASCII/binary. Defines new
+  variables via typed mathematical expressions ("Mathematica-like");
+  produces plots (line, contour, vector, wireframe) via commands, not a
+  persistent interactive 3D scene.
+  Source: https://ferret.pmel.noaa.gov/Ferret/documentation/users-guide/data-set-basics/NETCDF-DATA
+- No native web/browser interface (a separate later project, Live Access
+  Server, added web access to Ferret's outputs).
+  Source: https://en.wikipedia.org/wiki/Ferret_Data_Visualization_and_Analysis
+
+**ODV — Ocean Data View (AWI, R. Schlitzer)**
+- Desktop software, used by 25,000+ scientists; built for point/profile,
+  time-series, and trajectory data (e.g., Argo floats), with two
+  weighted-averaging gridding methods plus DIVA gridding.
+  Source: https://odv.awi.de/
+- Supports NetCDF (CF/COARDS/GDT/CDC) and its own ODV spreadsheet ASCII
+  format; can directly import Argo, WOCE, GTSPP, World Ocean Database.
+  Source: https://www.bodc.ac.uk/resources/delivery_formats/odv_format/
+- Desktop application; not browser-native, no built-in 3D volumetric
+  model-field rendering (it visualizes point/profile data and gridded
+  2D/section fields, not a full interactive 3D water-column volume).
+
+**MATLAB (community oceanography toolboxes, not one unified tool)**
+- No single official "ocean viewer" — scientists assemble scripts from
+  separate community toolboxes: e.g. the Argo Toolbox (fetches/imports
+  Argo NetCDF into the MATLAB workspace), SEA-MAT (mapping, seawater
+  properties, mooring tools), NCTOOLBOX (reads NetCDF/OPeNDAP/GRIB), and
+  ocean_data_tools (builds uniform structs from Argo/glider/model data).
+  Sources: https://www.mathworks.com/matlabcentral/fileexchange/54503-argo-toolbox ,
+  https://sea-mat.github.io/sea-mat/ ,
+  https://polar.ncep.noaa.gov/global/examples/usingmatlab2.shtml ,
+  https://github.com/lnferris/ocean_data_tools
+- Requires programming for every new analysis; no out-of-the-box
+  co-display of model fields and instrument profiles.
+
+**The common, citable gap (this is OceanScope's actual justification):**
+All three are desktop or command-line tools. None natively run in a
+browser. None co-visualize gridded model fields and real in-situ
+instrument profiles (Argo/BGC-Argo/Glider/CTD) in one interactive 3D
+scene with click-to-compare — a scientist must open a separate tool per
+data type and correlate results manually, which is exactly the
+"toggling between disparate software packages" problem the PS describes.
+
+**Page content:**
+- A clearly-sourced summary table: tool, primary use, data format(s),
+  interface type, and whether it does 3D co-visualization — each row
+  linking to its real source above.
+- A short, honest "what OceanScope adds" statement grounded only in
+  what's actually built (browser-native 3D, real Argo/BGC-Argo overlay,
+  RMSE comparison, upload ingestion, OGC endpoints) — no exaggerated or
+  unverifiable claims.
+- Screenshots of OceanScope's own working features as the proof, since
+  the team does not have rights to reproduce the other tools' UI.
+
+**Manual test:** every claim on this page must be traceable to a source
+above; if the agent adds any claim not covered by this research, it must
+flag it for the user to verify rather than publishing it.
+
 ---
 
 ## 8. Demo Script for Judges (~5–6 minutes)
