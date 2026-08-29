@@ -17,12 +17,16 @@ function VisualizationControls({
   onOpacityChange,
   verticalExaggeration,
   onVerticalExaggerationChange,
+  isosurfaceEnabled,
+  onIsosurfaceEnabledChange,
+  isosurfaceThreshold,
+  onIsosurfaceThresholdChange,
   uploadSelected,
   error,
 }) {
   return (
     <fieldset style={{ margin: "0 0 16px", padding: "12px 16px", border: "1px solid #526978" }}>
-      <legend><strong>Variable and colorbar controls</strong></legend>
+      <legend><strong>Variable and visualization controls</strong></legend>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 20px", alignItems: "end" }}>
         <label>
           Variable<br />
@@ -83,6 +87,27 @@ function VisualizationControls({
             step="0.1"
             value={verticalExaggeration}
             onChange={(event) => onVerticalExaggerationChange(Number(event.target.value))}
+          />
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={isosurfaceEnabled}
+            onChange={(event) => onIsosurfaceEnabledChange(event.target.checked)}
+          />{" "}
+          True isosurface
+        </label>
+        <label>
+          Isosurface threshold: {isosurfaceThreshold.toFixed(2)} {unit}<br />
+          <input
+            aria-label="Isosurface threshold"
+            type="range"
+            min={minimum}
+            max={maximum}
+            step={(maximum - minimum) / 200}
+            value={isosurfaceThreshold}
+            disabled={!isosurfaceEnabled}
+            onChange={(event) => onIsosurfaceThresholdChange(Number(event.target.value))}
           />
         </label>
       </div>

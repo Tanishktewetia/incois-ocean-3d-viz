@@ -10,6 +10,7 @@ import {
   createCurrentParticles,
   CURRENT_PARTICLE_COUNT,
 } from "../utils/currentParticles.js";
+import { createIsosurface } from "../utils/isosurface.js";
 
 const SCENE_HEIGHT = 560;
 const PLANE_WIDTH = 12;
@@ -31,11 +32,17 @@ function createOceanScene(
   scale,
   opacity,
   verticalExaggeration,
+  isosurfaceEnabled,
+  isosurfaceThreshold,
   onInstrumentSelect,
   onInstrumentHover,
 ) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07131d);
+  scene.add(new THREE.HemisphereLight(0xcceeff, 0x13202a, 2.1));
+  const isosurfaceLight = new THREE.DirectionalLight(0xffffff, 2.2);
+  isosurfaceLight.position.set(6, -8, 10);
+  scene.add(isosurfaceLight);
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   camera.position.set(10, -13, 10);
@@ -64,6 +71,10 @@ function createOceanScene(
     surfaceZ: STACK_HEIGHT / 2,
   });
   scene.add(currentParticles.points);
+  const isosurface = createIsosurface(payload, range, PLANE_WIDTH, planeHeight, STACK_HEIGHT);
+  scene.add(isosurface.mesh);
+  isosurface.setThreshold(isosurfaceThreshold);
+  isosurface.setVisible(isosurfaceEnabled);
   const instrumentMarkers = new THREE.Group();
   const markerGeometries = {
     core_argo: new THREE.SphereGeometry(0.1, 16, 12),
@@ -133,6 +144,7 @@ function createOceanScene(
     });
     frame.scale.z = exaggeration;
     frame.position.z = STACK_HEIGHT / 2 - (STACK_HEIGHT * exaggeration) / 2;
+    isosurface.setVerticalExaggeration(exaggeration);
   }
   positionDepthLayers(verticalExaggeration);
 
@@ -227,6 +239,7 @@ function createOceanScene(
         textures[index].image.data.set(pixels);
         textures[index].needsUpdate = true;
       });
+      isosurface.updateVolume(nextPayload, nextRange);
     },
     setOpacity(nextOpacity) {
       layerOpacity = nextOpacity;
@@ -239,6 +252,12 @@ function createOceanScene(
     },
     setVerticalExaggeration(exaggeration) {
       positionDepthLayers(exaggeration);
+    },
+    setIsosurfaceVisible(visible) {
+      isosurface.setVisible(visible);
+    },
+    setIsosurfaceThreshold(threshold) {
+      isosurface.setThreshold(threshold);
     },
     highlightDepth(selectedIndex) {
       selectedDepthIndex = selectedIndex;
@@ -262,6 +281,7 @@ function createOceanScene(
       Object.values(markerGeometries).forEach((value) => value.dispose());
       Object.values(markerMaterials).forEach((value) => value.dispose());
       selectedMarkerMaterial.dispose();
+      isosurface.dispose();
       currentParticles.dispose();
       textures.forEach((texture) => texture.dispose());
       materials.forEach((material) => material.dispose());
@@ -285,6 +305,8 @@ function OceanScene3D({ dataSource }) {
   const [scale, setScale] = useState("linear");
   const [opacity, setOpacity] = useState(0.9);
   const [verticalExaggeration, setVerticalExaggeration] = useState(1);
+  const [isosurfaceEnabled, setIsosurfaceEnabled] = useState(false);
+  const [isosurfaceThreshold, setIsosurfaceThreshold] = useState(0);
   const [controlsError, setControlsError] = useState("");
   const [times, setTimes] = useState([]);
   const [selectedDepthIndex, setSelectedDepthIndex] = useState(0);
@@ -311,7 +333,9 @@ function OceanScene3D({ dataSource }) {
       .then((layersPayload) => {
         payloadRef.current = layersPayload;
         setPayload(layersPayload);
-        setRange(getFiniteRange(layersPayload.layers.map((layer) => layer.values)));
+        const nextRange = getFiniteRange(layersPayload.layers.map((layer) => layer.values));
+        setRange(nextRange);
+        setIsosurfaceThreshold((nextRange.minimum + nextRange.maximum) / 2);
         setScale("linear");
         setTimes(layersPayload.times);
         setSelectedTimeIndex(layersPayload.times.indexOf(layersPayload.time));
@@ -344,6 +368,8 @@ function OceanScene3D({ dataSource }) {
         scale,
         opacity,
         verticalExaggeration,
+        isosurfaceEnabled,
+        isosurfaceThreshold,
         setSelectedInstrumentId,
         setHoveredInstrument,
       );
@@ -370,6 +396,14 @@ function OceanScene3D({ dataSource }) {
   useEffect(() => {
     sceneApiRef.current?.setVerticalExaggeration(verticalExaggeration);
   }, [verticalExaggeration]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setIsosurfaceVisible(isosurfaceEnabled);
+  }, [isosurfaceEnabled]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setIsosurfaceThreshold(isosurfaceThreshold);
+  }, [isosurfaceThreshold]);
 
   useEffect(() => {
     sceneApiRef.current?.selectInstrument(selectedInstrumentId);
@@ -480,6 +514,10 @@ function OceanScene3D({ dataSource }) {
     }
     setControlsError("");
     setRange(nextRange);
+    setIsosurfaceThreshold((threshold) => Math.min(
+      nextRange.maximum,
+      Math.max(nextRange.minimum, threshold),
+    ));
   }, [range, scale]);
 
   const handleScaleChange = useCallback((nextScale) => {
@@ -509,6 +547,10 @@ function OceanScene3D({ dataSource }) {
           onOpacityChange={setOpacity}
           verticalExaggeration={verticalExaggeration}
           onVerticalExaggerationChange={setVerticalExaggeration}
+          isosurfaceEnabled={isosurfaceEnabled}
+          onIsosurfaceEnabledChange={setIsosurfaceEnabled}
+          isosurfaceThreshold={isosurfaceThreshold}
+          onIsosurfaceThresholdChange={setIsosurfaceThreshold}
           uploadSelected={dataSource === "upload"}
           error={controlsError}
         />

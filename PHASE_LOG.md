@@ -291,3 +291,23 @@
   5. Change depth and date for each variable, rotate/zoom the scene, and enable current particles. Confirm existing depth/time, instrument selection, and real current animation controls still work.
   6. Select **My upload** after uploading a valid Phase 8 temperature NetCDF. Confirm the variable returns to **Temperature** and salinity/current-magnitude choices are disabled and explained.
 - **Automated validation:** All 23 backend unit tests pass, including real-variable routing, exact 3-4-5 current-magnitude derivation, unsupported-variable errors, and temperature-only upload enforcement. Python compilation and `git diff --check` pass. The frontend production build passes with only the existing non-fatal large-chunk warning. Direct real-file smoke checks returned eight layers for all three variables with plausible ranges. A live Uvicorn smoke test returned HTTP 200 for `thetao`, `so`, and `current_magnitude` at the requested date, and HTTP 400 for unsupported upload salinity.
+
+## Phase 11 — True Isosurface Extraction
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/src/utils/isosurface.js`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/components/VisualizationControls.jsx`
+  - `PHASE_LOG.md`
+- **Implementation:** Added a real Three.js `MarchingCubes` mesh imported from `three/examples/jsm/objects/MarchingCubes.js`. The eight API depth layers are resampled into a 32×32×32 scalar volume with trilinear interpolation across longitude, latitude, and the layers' nonuniform model depths. Cells touching missing/land values receive a finite below-range sentinel so coastlines do not create invalid vertices. The generated cube is scaled to the displayed geographic rectangle and model-depth stack, with depth directed downward.
+- **Controls and lifecycle:** Added a **True isosurface** toggle and variable-unit threshold slider. The threshold defaults to the selected field's midpoint, remains inside edited color bounds, and invokes `MarchingCubes.update()` as it moves. The volume and geometry regenerate when variable, source, or time changes; the mesh follows vertical exaggeration and uses a threshold-colored, lit, semitransparent material. Geometry and material resources are disposed with the existing scene. Existing layers, particles, markers, uploads, and APIs are unchanged.
+- **Deviations from the plan:** None. Resolution is fixed at 32³ as an implementation choice that provides true extraction while keeping interactive slider updates practical in the browser. No Phase 12 or later functionality was added.
+- **Manual test:**
+  1. Ensure the required gitignored model files exist, start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`, start the frontend with `npm run dev --prefix frontend`, and open `http://localhost:5173`.
+  2. Enable **True isosurface**. Confirm a smooth, semitransparent 3D mesh appears inside the depth stack rather than another flat layer.
+  3. Drag **Isosurface threshold** slowly from low to high. Confirm the mesh regenerates continuously and its shape/extent changes; for temperature, warmer regions should generally contract as the threshold rises.
+  4. Switch among **Temperature**, **Salinity**, and **Current magnitude** and change the model date. Confirm the threshold resets to a valid midpoint with the correct unit and the mesh changes to the newly loaded volume.
+  5. Change vertical exaggeration and rotate/zoom the scene. Confirm the isosurface stretches with the depth frame and remains spatially aligned with the layer stack.
+  6. Toggle the isosurface off and confirm the existing depth layers, instrument markers, current particles, and upload behavior continue unchanged.
+- **Automated validation:** All 23 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only the existing non-fatal large-chunk warning. A synthetic Node validation confirmed trilinear midpoint interpolation (`6.5`), verified the object is Three.js `MarchingCubes`, generated 6,582 vertices, and regenerated to 6,576 vertices after replacing the scalar volume. `git diff --check` passes.
