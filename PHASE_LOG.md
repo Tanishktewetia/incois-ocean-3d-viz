@@ -368,3 +368,24 @@
   6. Select Core Argo, BGC-Argo, and sample Glider/CTD markers. Confirm profiles remain legible on the dark background, RMSE appears when available, and sample data is clearly labelled.
   7. Test the Data Lab with the bundled source and a valid upload, then visit `http://localhost:5173/about` and verify the workflow, guided callouts, impact statement, coverage list, navigation, and return links.
 - **Automated validation:** All 29 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
+
+## Phase 13 — Focused Visual/UX Correction
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/src/styles.css`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/components/ProfileChart.jsx`
+  - `PHASE_LOG.md`
+- **Light visual system:** Replaced the dark application chrome with white and pale-blue surfaces, clear blue-grey borders, teal interactive states, softer shadows, and higher-contrast scientific typography across the Explorer, Data Lab, profile UI, and About page. The WebGL plotting viewport intentionally remains deep navy so the real ocean color scale and instrument markers retain contrast. Existing labels, values, provenance, and sample-data warnings are unchanged.
+- **Workspace layout:** Kept visual controls in a viewport-bounded sticky sidebar beside a scene that consumes the remaining desktop width. The observation panel remains a third column on very wide screens and moves below the controls/scene pair at common desktop widths; the established stacked layout remains below 900 px. The earlier fluid 16–20 px root typography and equal Data Lab card proportions are retained, with the heatmap width capped but its intrinsic aspect ratio unrestricted.
+- **Fullscreen and camera interaction:** Added accessible native Fullscreen API controls to the 3D scene and observation-profile panels, including synchronized collapse labels and Escape-key compatibility. Rotate and Pan are now true mutually exclusive interaction modes: selecting either maps left-click drag to the corresponding existing `OrbitControls` action, while middle/right drag continues to pan and the wheel continues to zoom. Pan mode exposes grab/grabbing cursor feedback. Zoom and Reset retain their existing camera behavior.
+- **Scope/deviations:** No data loading, API calls, source labels, Three.js scene rendering, camera position math, or scientific computations were changed. `ProfileChart.jsx` only changes Chart.js presentation colors and label sizes for the light surface. No dependencies were added.
+- **Manual test:**
+  1. Start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`, start the frontend with `npm run dev --prefix frontend`, and open `http://localhost:5173`.
+  2. At desktop widths above 900 px, confirm the sticky controls and 3D scene remain visible together while scrolling within long controls; at very wide widths confirm the profile is a third column, and at narrower widths confirm panels stack without horizontal overflow.
+  3. Confirm the Explorer, Data Lab, observation panel, and `/about` use light surfaces, crisp borders, readable dark text, and teal/blue controls, while the plotting viewport remains dark for data contrast. Check at 125%, 150%, and 200% browser zoom.
+  4. Select **Rotate** and confirm left-drag orbits the camera. Select **Pan** and confirm the active state and grab cursor appear and left-drag pans. Confirm wheel zoom works in both modes, middle/right drag still pans, and **Reset** restores the default view.
+  5. Use **Enlarge** on the scene, confirm it fills the viewport and resizes correctly, then use **Collapse** or Escape. Select an instrument, repeat for the observation profile, and confirm its chart grows to the available viewport.
+  6. Recheck Core Argo, BGC-Argo, and Glider/CTD profiles to confirm all real labels and the existing **SAMPLE DATA** warnings remain exactly visible.
+- **Automated validation:** All 29 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
