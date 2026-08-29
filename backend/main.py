@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers.argo import router as argo_router
 from backend.routers.instruments import router as instruments_router
+from backend.routers.ogc import router as ogc_router
 from backend.routers.ocean import router as ocean_router
 
 app = FastAPI(title="Ocean 3D Visualization API")
@@ -18,6 +19,7 @@ app.add_middleware(
 app.include_router(ocean_router)
 app.include_router(argo_router)
 app.include_router(instruments_router)
+app.include_router(ogc_router)
 
 
 @app.get("/health")
