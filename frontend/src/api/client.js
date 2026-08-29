@@ -36,6 +36,18 @@ export async function getOceanLayers({ variable = "thetao", time, signal } = {})
   return response.json();
 }
 
+export async function getOceanCurrents({ time, signal } = {}) {
+  const parameters = new URLSearchParams();
+  if (time) {
+    parameters.set("time", time);
+  }
+  const response = await fetch(`/api/currents?${parameters}`, { signal });
+  if (!response.ok) {
+    throw new Error(`Ocean currents request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
 export async function getArgoProfiles({ signal } = {}) {
   const response = await fetch("/api/argo", { signal });
   if (!response.ok) {

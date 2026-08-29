@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { getOceanLayers } from "../api/client.js";
+import { getOceanCurrents, getOceanLayers } from "../api/client.js";
 import ArgoOverlay from "./ArgoOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
+import {
+  createCurrentParticles,
+  CURRENT_PARTICLE_COUNT,
+} from "../utils/currentParticles.js";
 
 const SCENE_HEIGHT = 560;
 const PLANE_WIDTH = 12;
@@ -35,6 +39,12 @@ function createOceanScene(container, payload, range, onArgoSelect) {
   const textures = [];
   const materials = [];
   const planes = [];
+  const currentParticles = createCurrentParticles({
+    planeWidth: PLANE_WIDTH,
+    planeHeight,
+    surfaceZ: STACK_HEIGHT / 2,
+  });
+  scene.add(currentParticles.points);
   const argoMarkers = new THREE.Group();
   const markerGeometry = new THREE.SphereGeometry(0.1, 16, 12);
   const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffa629 });
@@ -109,6 +119,7 @@ function createOceanScene(container, payload, range, onArgoSelect) {
 
   let animationFrame;
   function animate() {
+    currentParticles.update();
     controls.update();
     renderer.render(scene, camera);
     animationFrame = requestAnimationFrame(animate);
@@ -116,6 +127,12 @@ function createOceanScene(container, payload, range, onArgoSelect) {
   animate();
 
   return {
+    setCurrentField(field) {
+      currentParticles.setField(field);
+    },
+    setParticlesVisible(visible) {
+      currentParticles.points.visible = visible;
+    },
     setArgoProfiles(profiles) {
       argoMarkers.clear();
       profiles.forEach((profile) => {
@@ -166,6 +183,7 @@ function createOceanScene(container, payload, range, onArgoSelect) {
       markerGeometry.dispose();
       markerMaterial.dispose();
       selectedMarkerMaterial.dispose();
+      currentParticles.dispose();
       textures.forEach((texture) => texture.dispose());
       materials.forEach((material) => material.dispose());
       geometry.dispose();
@@ -190,6 +208,9 @@ function OceanScene3D() {
   const [selectedArgoProfileId, setSelectedArgoProfileId] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
+  const [particlesEnabled, setParticlesEnabled] = useState(false);
+  const [currentField, setCurrentField] = useState(null);
+  const [currentStatus, setCurrentStatus] = useState("off");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -281,6 +302,36 @@ function OceanScene3D() {
     return () => controller.abort();
   }, [selectedTimeIndex, times]);
 
+  useEffect(() => {
+    sceneApiRef.current?.setParticlesVisible(particlesEnabled && currentField !== null);
+  }, [currentField, particlesEnabled]);
+
+  useEffect(() => {
+    if (!particlesEnabled || selectedTimeIndex === null || times.length === 0) {
+      setCurrentStatus("off");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setCurrentStatus("loading");
+    sceneApiRef.current?.setParticlesVisible(false);
+    getOceanCurrents({ time: times[selectedTimeIndex], signal: controller.signal })
+      .then((field) => {
+        setCurrentField(field);
+        sceneApiRef.current?.setCurrentField(field);
+        sceneApiRef.current?.setParticlesVisible(true);
+        setCurrentStatus("ready");
+      })
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") {
+          setCurrentStatus("error");
+          sceneApiRef.current?.setParticlesVisible(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [particlesEnabled, selectedTimeIndex, times]);
+
   const handleTimeChange = useCallback((index) => {
     setSelectedTimeIndex(index);
   }, []);
@@ -306,6 +357,36 @@ function OceanScene3D() {
           onTimeChange={handleTimeChange}
           isUpdating={isUpdating}
         />
+      )}
+      {payload && (
+        <div
+          style={{
+            margin: "0 0 16px",
+            padding: "12px 16px",
+            border: "1px solid #526978",
+            background: "#102430",
+          }}
+        >
+          <label>
+            <input
+              type="checkbox"
+              checked={particlesEnabled}
+              onChange={(event) => setParticlesEnabled(event.target.checked)}
+            />{" "}
+            <strong>Animate real surface currents</strong>
+          </label>
+          <span aria-live="polite" style={{ marginLeft: "12px" }}>
+            {currentStatus === "loading" && "Loading uo/vo vectors…"}
+            {currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)} · ${currentField.depth.toFixed(2)} m`}
+            {currentStatus === "error" && "Current vectors unavailable."}
+            {currentStatus === "off" && "Off"}
+          </span>
+          {currentStatus === "ready" && (
+            <div style={{ marginTop: "6px" }}>
+              Motion follows Copernicus eastward (uo) and northward (vo) velocity in {currentField.unit}.
+            </div>
+          )}
+        </div>
       )}
       <div
         ref={containerRef}

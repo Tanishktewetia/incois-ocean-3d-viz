@@ -4,11 +4,28 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from backend.services.slicer import (
     OceanDataUnavailableError,
+    request_currents,
     request_layers,
     request_slice,
 )
 
 router = APIRouter(prefix="/api", tags=["ocean"])
+
+
+@router.get("/currents")
+def get_currents(time: str | None = None) -> dict[str, Any]:
+    try:
+        return request_currents(time=time)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        ) from error
+    except OceanDataUnavailableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
 
 
 @router.get("/slice")
