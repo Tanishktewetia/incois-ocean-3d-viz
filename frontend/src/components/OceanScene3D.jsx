@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { getOceanCurrents, getOceanLayers } from "../api/client.js";
-import ArgoOverlay from "./ArgoOverlay.jsx";
+import InstrumentOverlay from "./InstrumentOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
 import {
@@ -14,7 +14,7 @@ const SCENE_HEIGHT = 560;
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
 
-function createOceanScene(container, payload, range, onArgoSelect) {
+function createOceanScene(container, payload, range, onInstrumentSelect, onInstrumentHover) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07131d);
 
@@ -45,13 +45,23 @@ function createOceanScene(container, payload, range, onArgoSelect) {
     surfaceZ: STACK_HEIGHT / 2,
   });
   scene.add(currentParticles.points);
-  const argoMarkers = new THREE.Group();
-  const markerGeometry = new THREE.SphereGeometry(0.1, 16, 12);
-  const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffa629 });
+  const instrumentMarkers = new THREE.Group();
+  const markerGeometries = {
+    core_argo: new THREE.SphereGeometry(0.1, 16, 12),
+    bgc_argo: new THREE.OctahedronGeometry(0.14),
+    glider: new THREE.ConeGeometry(0.14, 0.28, 3),
+    ctd: new THREE.BoxGeometry(0.2, 0.2, 0.2),
+  };
+  const markerMaterials = {
+    core_argo: new THREE.MeshBasicMaterial({ color: 0xffa629 }),
+    bgc_argo: new THREE.MeshBasicMaterial({ color: 0x56d98b }),
+    glider: new THREE.MeshBasicMaterial({ color: 0xd47cff }),
+    ctd: new THREE.MeshBasicMaterial({ color: 0xd47cff }),
+  };
   const selectedMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  scene.add(argoMarkers);
+  scene.add(instrumentMarkers);
 
   payload.layers.forEach((layer) => {
     const pixels = createColorBuffer(
@@ -99,12 +109,21 @@ function createOceanScene(container, payload, range, onArgoSelect) {
     pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(argoMarkers.children, false)[0];
+    const hit = raycaster.intersectObjects(instrumentMarkers.children, false)[0];
     if (hit) {
-      onArgoSelect(hit.object.userData.profileId);
+      onInstrumentSelect(hit.object.userData.instrument.id);
     }
   }
+  function handlePointerMove(event) {
+    const bounds = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+    pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hit = raycaster.intersectObjects(instrumentMarkers.children, false)[0];
+    onInstrumentHover(hit?.object.userData.instrument || null);
+  }
   renderer.domElement.addEventListener("click", handlePointerClick);
+  renderer.domElement.addEventListener("pointermove", handlePointerMove);
 
   function resize() {
     const width = Math.max(container.clientWidth, 320);
@@ -133,24 +152,35 @@ function createOceanScene(container, payload, range, onArgoSelect) {
     setParticlesVisible(visible) {
       currentParticles.points.visible = visible;
     },
-    setArgoProfiles(profiles) {
-      argoMarkers.clear();
-      profiles.forEach((profile) => {
-        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-        marker.position.set(
-          ((profile.longitude - payload.longitudes[0]) / longitudeSpan - 0.5) * PLANE_WIDTH,
-          ((profile.latitude - payload.latitudes[0]) / latitudeSpan - 0.5) * planeHeight,
-          STACK_HEIGHT / 2 + 0.18,
+    setInstruments(instruments) {
+      instrumentMarkers.clear();
+      instruments.forEach((instrument) => {
+        const markerElevation = {
+          core_argo: 0.18,
+          bgc_argo: 0.4,
+          glider: 0.62,
+          ctd: 0.62,
+        }[instrument.instrument_type];
+        const marker = new THREE.Mesh(
+          markerGeometries[instrument.instrument_type],
+          markerMaterials[instrument.instrument_type],
         );
-        marker.userData.profileId = profile.id;
+        marker.position.set(
+          ((instrument.longitude - payload.longitudes[0]) / longitudeSpan - 0.5) * PLANE_WIDTH,
+          ((instrument.latitude - payload.latitudes[0]) / latitudeSpan - 0.5) * planeHeight,
+          STACK_HEIGHT / 2 + markerElevation,
+        );
+        marker.userData.instrument = instrument;
         marker.renderOrder = 100;
-        argoMarkers.add(marker);
+        instrumentMarkers.add(marker);
       });
     },
-    selectArgoProfile(profileId) {
-      argoMarkers.children.forEach((marker) => {
-        const selected = marker.userData.profileId === profileId;
-        marker.material = selected ? selectedMarkerMaterial : markerMaterial;
+    selectInstrument(instrumentId) {
+      instrumentMarkers.children.forEach((marker) => {
+        const selected = marker.userData.instrument.id === instrumentId;
+        marker.material = selected
+          ? selectedMarkerMaterial
+          : markerMaterials[marker.userData.instrument.instrument_type];
         marker.scale.setScalar(selected ? 1.65 : 1);
       });
     },
@@ -178,10 +208,11 @@ function createOceanScene(container, payload, range, onArgoSelect) {
     dispose() {
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("click", handlePointerClick);
+      renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       resizeObserver.disconnect();
       controls.dispose();
-      markerGeometry.dispose();
-      markerMaterial.dispose();
+      Object.values(markerGeometries).forEach((value) => value.dispose());
+      Object.values(markerMaterials).forEach((value) => value.dispose());
       selectedMarkerMaterial.dispose();
       currentParticles.dispose();
       textures.forEach((texture) => texture.dispose());
@@ -199,13 +230,14 @@ function OceanScene3D({ dataSource }) {
   const containerRef = useRef(null);
   const sceneApiRef = useRef(null);
   const payloadRef = useRef(null);
-  const argoProfilesRef = useRef([]);
+  const instrumentsRef = useRef([]);
   const [payload, setPayload] = useState(null);
   const [range, setRange] = useState(null);
   const [times, setTimes] = useState([]);
   const [selectedDepthIndex, setSelectedDepthIndex] = useState(0);
   const [selectedTimeIndex, setSelectedTimeIndex] = useState(null);
-  const [selectedArgoProfileId, setSelectedArgoProfileId] = useState(null);
+  const [selectedInstrumentId, setSelectedInstrumentId] = useState(null);
+  const [hoveredInstrument, setHoveredInstrument] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
   const [particlesEnabled, setParticlesEnabled] = useState(false);
@@ -248,10 +280,10 @@ function OceanScene3D({ dataSource }) {
         containerRef.current,
         payload,
         range,
-        setSelectedArgoProfileId,
+        setSelectedInstrumentId,
+        setHoveredInstrument,
       );
-      sceneApiRef.current.highlightDepth(selectedDepthIndex);
-      sceneApiRef.current.setArgoProfiles(argoProfilesRef.current);
+      sceneApiRef.current.setInstruments(instrumentsRef.current);
     } else {
       sceneApiRef.current.updateLayers(payload, range);
     }
@@ -267,8 +299,8 @@ function OceanScene3D({ dataSource }) {
   }, [selectedDepthIndex]);
 
   useEffect(() => {
-    sceneApiRef.current?.selectArgoProfile(selectedArgoProfileId);
-  }, [selectedArgoProfileId]);
+    sceneApiRef.current?.selectInstrument(selectedInstrumentId);
+  }, [selectedInstrumentId]);
 
   useEffect(() => {
     if (selectedTimeIndex === null || times.length === 0) {
@@ -353,9 +385,9 @@ function OceanScene3D({ dataSource }) {
     setSelectedTimeIndex(index);
   }, []);
 
-  const handleArgoProfilesLoaded = useCallback((profiles) => {
-    argoProfilesRef.current = profiles;
-    sceneApiRef.current?.setArgoProfiles(profiles);
+  const handleInstrumentsLoaded = useCallback((instruments) => {
+    instrumentsRef.current = instruments;
+    sceneApiRef.current?.setInstruments(instruments);
   }, []);
 
   return (
@@ -407,19 +439,39 @@ function OceanScene3D({ dataSource }) {
           )}
         </div>
       )}
-      <div
-        ref={containerRef}
-        role="img"
-        aria-label="Rotatable stack of eight sea temperature planes from the surface to 1942 metres"
-        style={{
-          display: payload ? "block" : "none",
-          width: "100%",
-          minHeight: `${SCENE_HEIGHT}px`,
-          overflow: "hidden",
-          border: "1px solid #526978",
-          background: "#07131d",
-        }}
-      />
+      <div style={{ position: "relative" }}>
+        <div
+          ref={containerRef}
+          role="img"
+          aria-label="Rotatable temperature stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers"
+          style={{
+            display: payload ? "block" : "none",
+            width: "100%",
+            minHeight: `${SCENE_HEIGHT}px`,
+            overflow: "hidden",
+            border: "1px solid #526978",
+            background: "#07131d",
+          }}
+        />
+        {hoveredInstrument && (
+          <div
+            role="tooltip"
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "12px",
+              padding: "8px 10px",
+              background: "rgba(7, 19, 29, 0.94)",
+              border: `1px solid ${hoveredInstrument.data_status === "sample" ? "#d47cff" : "#8fb4c8"}`,
+              pointerEvents: "none",
+            }}
+          >
+            <strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>
+            {hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}
+            <div>{hoveredInstrument.variables.join(", ")}</div>
+          </div>
+        )}
+      </div>
       {payload && range && (
         <p>
           Depths: {payload.layers.map((layer) => layer.depth.toFixed(0)).join(", ")} m
@@ -429,9 +481,9 @@ function OceanScene3D({ dataSource }) {
           {" · "}{payload.source === "demo" ? "Copernicus Marine temperature data (India EEZ)" : "My upload"}
         </p>
       )}
-      <ArgoOverlay
-        selectedProfileId={selectedArgoProfileId}
-        onProfilesLoaded={handleArgoProfilesLoaded}
+      <InstrumentOverlay
+        selectedInstrumentId={selectedInstrumentId}
+        onInstrumentsLoaded={handleInstrumentsLoaded}
       />
     </section>
   );

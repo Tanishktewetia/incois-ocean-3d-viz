@@ -99,3 +99,22 @@ export async function getArgoProfile(profileId, { signal } = {}) {
   }
   return response.json();
 }
+
+export async function getInstruments({ signal } = {}) {
+  const response = await fetch("/api/instruments", { signal });
+  if (!response.ok) {
+    throw new Error(`Instrument catalog request failed with status ${response.status}`);
+  }
+  return response.json();
+}
+
+export async function getInstrumentProfile(instrumentId, { signal } = {}) {
+  const response = await fetch(
+    `/api/instruments/${encodeURIComponent(instrumentId)}/profile`,
+    { signal },
+  );
+  if (!response.ok) {
+    throw new Error(`Instrument profile request failed with status ${response.status}`);
+  }
+  return response.json();
+}

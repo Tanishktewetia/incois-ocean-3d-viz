@@ -1,46 +1,33 @@
 import { useEffect, useRef } from "react";
 import Chart from "chart.js/auto";
 
-function ProfileChart({ profile }) {
+const COLORS = ["#ffb347", "#4fc3f7", "#56d98b", "#d47cff"];
+
+function SeriesChart({ series, sample }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
-    if (!canvasRef.current || !profile) {
+    if (!canvasRef.current) {
       return undefined;
     }
 
     const chart = new Chart(canvasRef.current, {
       type: "line",
       data: {
-        datasets: [
-          {
-            label: "Argo observed temperature",
-            data: profile.measurements.map((measurement) => ({
-              x: measurement.temperature,
-              y: measurement.depth,
-            })),
-            borderColor: "#ffb347",
-            backgroundColor: "#ffb347",
-            borderWidth: 2,
-            pointRadius: 0,
-            pointHitRadius: 5,
-            tension: 0,
-          },
-          {
-            label: "Copernicus model temperature",
-            data: profile.model_comparison.model_profile.map((measurement) => ({
-              x: measurement.temperature,
-              y: measurement.depth,
-            })),
-            borderColor: "#4fc3f7",
-            backgroundColor: "#4fc3f7",
-            borderWidth: 2,
-            borderDash: [6, 4],
-            pointRadius: 0,
-            pointHitRadius: 5,
-            tension: 0,
-          },
-        ],
+        datasets: series.map((item, index) => ({
+          label: `${item.label}${sample ? " (SAMPLE DATA)" : ""}`,
+          data: item.measurements.map((measurement) => ({
+            x: measurement.value,
+            y: measurement.depth,
+          })),
+          borderColor: COLORS[index % COLORS.length],
+          backgroundColor: COLORS[index % COLORS.length],
+          borderWidth: 2,
+          borderDash: item.variable === "model_temperature" ? [6, 4] : [],
+          pointRadius: 0,
+          pointHitRadius: 5,
+          tension: 0,
+        })),
       },
       options: {
         maintainAspectRatio: false,
@@ -50,7 +37,7 @@ function ProfileChart({ profile }) {
         scales: {
           x: {
             type: "linear",
-            title: { display: true, text: "Temperature (°C)" },
+            title: { display: true, text: `${series[0].label} (${series[0].unit})` },
           },
           y: {
             type: "linear",
@@ -63,16 +50,30 @@ function ProfileChart({ profile }) {
     });
 
     return () => chart.destroy();
-  }, [profile]);
+  }, [sample, series]);
 
   return (
     <div style={{ height: "420px" }}>
       <canvas
         ref={canvasRef}
-        aria-label="Argo and Copernicus model depth versus temperature profiles"
+        aria-label={`${sample ? "Sample " : ""}${series.map((item) => item.label).join(" and ")} depth profile`}
       />
     </div>
   );
+}
+
+function ProfileChart({ profile }) {
+  const groups = Object.values(profile.profile.series.reduce((result, series) => ({
+    ...result,
+    [series.unit]: [...(result[series.unit] || []), series],
+  }), {}));
+  return groups.map((series) => (
+    <SeriesChart
+      key={`${profile.id}-${series[0].unit}`}
+      series={series}
+      sample={profile.data_status === "sample"}
+    />
+  ));
 }
 
 export default ProfileChart;
