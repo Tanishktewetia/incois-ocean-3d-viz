@@ -44,7 +44,7 @@ function DatasetUpload({ dataSource, upload, onDataSourceChange, onUpload }) {
           checked={dataSource === "demo"}
           onChange={() => onDataSourceChange("demo")}
         />{" "}
-        Demo dataset
+        Copernicus Marine temperature data (India EEZ)
       </label>
       <label>
         <input

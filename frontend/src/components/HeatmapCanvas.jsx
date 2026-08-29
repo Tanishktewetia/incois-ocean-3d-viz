@@ -77,7 +77,7 @@ function HeatmapCanvas({ dataSource }) {
           {" · "}{slice.depth.toFixed(2)} m
           {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
           {" · "}{slice.time.slice(0, 10)}
-          {" · "}{slice.source === "demo" ? "Demo dataset" : "My upload"}
+          {" · "}{slice.source === "demo" ? "Copernicus Marine temperature data (India EEZ)" : "My upload"}
         </p>
       )}
     </section>

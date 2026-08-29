@@ -398,7 +398,7 @@ function OceanScene3D({ dataSource }) {
             {currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)} · ${currentField.depth.toFixed(2)} m`}
             {currentStatus === "error" && "Current vectors unavailable."}
             {currentStatus === "off" && "Off"}
-            {dataSource === "upload" && " · currents require the demo uo/vo dataset"}
+            {dataSource === "upload" && " · currents use Copernicus Marine surface-current data (uo/vo)"}
           </span>
           {currentStatus === "ready" && (
             <div style={{ marginTop: "6px" }}>
@@ -426,7 +426,7 @@ function OceanScene3D({ dataSource }) {
           {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
           {" · Selected: "}{payload.layers[selectedDepthIndex].depth.toFixed(0)} m
           {" · "}{payload.time.slice(0, 10)}
-          {" · "}{payload.source === "demo" ? "Demo dataset" : "My upload"}
+          {" · "}{payload.source === "demo" ? "Copernicus Marine temperature data (India EEZ)" : "My upload"}
         </p>
       )}
       <ArgoOverlay
