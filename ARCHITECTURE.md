@@ -10,7 +10,7 @@
 
 - Remote: `https://github.com/Tanishktewetia/incois-ocean-3d-viz.git`
 - Branch: `main`
-- Identity for commits: username `Tanishktewetia`, email `tanishktewetia@gmail.com`
+- Identity for commits: username `Tanishktewetia`
 - **Push after every phase:**
   ```
   git add -A
