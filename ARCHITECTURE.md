@@ -10,7 +10,7 @@
 
 - Remote: `https://github.com/Tanishktewetia/incois-ocean-3d-viz.git`
 - Branch: `main`
-- Identity for commits: username `Tanishktewetia`
+- Identity for commits: username `Tanishktewetia`, email `tanishktewetia@gmail.com`
 - **Push after every phase:**
   ```
   git add -A
@@ -254,6 +254,18 @@ re-upload the demo file, scene renders identically to the cached path.
 - Dark theme, consistent spacing, colorbar legend with real labels, axis
   labels, loading states.
 - Every interactive control gets a short inline label/tooltip.
+- **Layout reference (arrangement only, not visual style):** a team
+  mockup suggested a clean panel arrangement — left sidebar with variable
+  selector buttons (Temperature/Salinity/Currents), colorbar with real
+  min/max numbers on the right, depth slider, opacity slider, vertical
+  exaggeration slider, a small region mini-map in a corner, and
+  rotate/pan/zoom/reset controls along the bottom. Use this as a spacing
+  and arrangement reference for the existing real controls.
+  **Do NOT add a photorealistic seafloor terrain, dramatic lighting, or
+  any fabricated bathymetry/canyon geometry** — the project's core value
+  is fast, reliable, data-accurate visualization for scientists, not
+  visual realism. Every surface rendered must trace back to an actual
+  data value; nothing decorative that isn't backed by real or user data.
 - Known small UX issues to fix here specifically (batched on purpose,
   not fixed piecemeal earlier, to avoid re-touching layout repeatedly):
   - 3D canvas is small and off-center; needs a full-width/responsive,
