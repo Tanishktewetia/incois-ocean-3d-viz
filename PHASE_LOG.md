@@ -334,3 +334,37 @@
   5. Open `http://127.0.0.1:8000/wcs?SERVICE=WCS&VERSION=2.0.1&REQUEST=DescribeCoverage&COVERAGEID=so` and confirm the coverage description XML includes its four-dimensional domain and range unit.
   6. Download a small coverage with `http://127.0.0.1:8000/wcs?SERVICE=WCS&VERSION=2.0.1&REQUEST=GetCoverage&COVERAGEID=thetao&FORMAT=application/x-netcdf&SUBSET=Long(70,71)&SUBSET=Lat(10,11)&SUBSET=depth(50)&SUBSET=time(2026-08-20T00:00:00Z)`, then open the resulting `thetao.nc` in QGIS, Panoply, or xarray and confirm its coordinates and values are subsetted.
 - **Automated validation:** All 29 backend `unittest` tests pass, including WMS/WCS capabilities metadata, PNG dimensions, unknown-layer rejection, coverage description, and four-axis NetCDF subsetting. Python byte-compilation and `git diff --check` pass. A live Uvicorn test against the real Copernicus files returned valid capabilities/description XML, a 128×96 RGBA WMS PNG, a CF-NetCDF current-magnitude subset with the expected dimensions and variables, and an OGC XML service exception for an invalid layer. The frontend production build passes with only the existing non-fatal large-chunk warning.
+
+## Phase 13 — Visual Polish and Context Page
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/index.html`
+  - `frontend/src/main.jsx`
+  - `frontend/src/App.jsx`
+  - `frontend/src/styles.css`
+  - `frontend/src/pages/AboutPage.jsx`
+  - `frontend/src/components/OceanScene3D.jsx`
+  - `frontend/src/components/VisualizationControls.jsx`
+  - `frontend/src/components/DepthTimeSlider.jsx`
+  - `frontend/src/components/ProfileChart.jsx`
+  - `frontend/src/components/InstrumentOverlay.jsx`
+  - `frontend/src/components/DatasetUpload.jsx`
+  - `frontend/src/components/HeatmapCanvas.jsx`
+  - `README.md`
+  - `DEMO_SCRIPT.md`
+  - `PHASE_LOG.md`
+- **Visual workspace:** Added a cohesive responsive dark application shell with sticky navigation, connection status, branded explorer introduction, consistent panels, real color-range labels, inline control guidance, loading/error states, keyboard focus treatment, reduced-motion behavior, a Data Lab, and a project footer. The wide-screen workspace now places controls, the responsive centered 3D scene, and observation profiles side by side, then collapses cleanly for tablets and phones.
+- **3D interaction:** Mapped left mouse to rotate, middle and right mouse to pan, and the wheel to zoom through the existing `OrbitControls`. Added visible rotate, pan, zoom, and reset actions; scene metadata; a guided marker hint; and a mini-map that reports only the actual loaded latitude/longitude extent. No coastline, bathymetry, terrain, or other untraceable geometry was introduced.
+- **Context and requirement coverage:** Added `/about` with a one-line problem statement, before/after workflow, guided workspace callouts, impact statement, and explicit PS 26067 coverage for variables, scientific controls, true isosurfaces, multi-instrument observations, RMSE, uploads, OGC services, and outreach usability. Glider/CTD sample status remains prominent.
+- **Documentation:** Added a complete setup, provenance, capability, usage, upload, OGC, and validation guide in `README.md`, plus a timed 5–6 minute judge walkthrough and direct data-honesty answers in `DEMO_SCRIPT.md`.
+- **Deviations from the plan:** No frontend dependency or routing package was added; the two static application routes use `window.location.pathname`. The mini-map intentionally visualizes only model bounds rather than fabricating a coastline. Remote Google font loading has system-font fallbacks, so the interface remains usable if fonts are unavailable.
+- **Manual test:**
+  1. Start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`, start the frontend with `npm run dev --prefix frontend`, and open `http://localhost:5173`.
+  2. At desktop width, confirm the control rail, responsive 3D scene, and profile panel sit side by side. Resize below 900 px and 640 px and confirm panels stack without horizontal overflow and camera buttons remain usable.
+  3. Confirm all variable, range, scale, opacity, vertical-exaggeration, isosurface, depth, time, particle, upload, and source controls have visible labels or tooltips and clear keyboard focus.
+  4. Left-drag to rotate, middle-drag to pan, and wheel-scroll to zoom. Exercise the four camera toolbar actions and confirm **Reset** restores the initial view.
+  5. Confirm the region mini-map coordinates match the loaded payload, loading overlays appear during date/variable updates, and no invented terrain or bathymetry appears.
+  6. Select Core Argo, BGC-Argo, and sample Glider/CTD markers. Confirm profiles remain legible on the dark background, RMSE appears when available, and sample data is clearly labelled.
+  7. Test the Data Lab with the bundled source and a valid upload, then visit `http://localhost:5173/about` and verify the workflow, guided callouts, impact statement, coverage list, navigation, and return links.
+- **Automated validation:** All 29 backend `unittest` tests pass and Python byte-compilation succeeds. The frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.

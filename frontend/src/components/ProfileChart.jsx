@@ -34,16 +34,24 @@ function SeriesChart({ series, sample }) {
         parsing: false,
         animation: false,
         interaction: { mode: "nearest", intersect: false },
+        plugins: {
+          legend: { labels: { color: "#a9bec6", boxWidth: 10, boxHeight: 2, font: { size: 9 } } },
+          tooltip: { backgroundColor: "#07131d", borderColor: "#35525e", borderWidth: 1 },
+        },
         scales: {
           x: {
             type: "linear",
-            title: { display: true, text: `${series[0].label} (${series[0].unit})` },
+            grid: { color: "rgba(148, 190, 205, 0.09)" },
+            ticks: { color: "#718b95", font: { size: 9 } },
+            title: { display: true, color: "#a9bec6", text: `${series[0].label} (${series[0].unit})` },
           },
           y: {
             type: "linear",
             reverse: true,
             min: 0,
-            title: { display: true, text: "Depth (m)" },
+            grid: { color: "rgba(148, 190, 205, 0.09)" },
+            ticks: { color: "#718b95", font: { size: 9 } },
+            title: { display: true, color: "#a9bec6", text: "Depth (m)" },
           },
         },
       },
@@ -53,7 +61,7 @@ function SeriesChart({ series, sample }) {
   }, [sample, series]);
 
   return (
-    <div style={{ height: "420px" }}>
+    <div className="chart-wrap">
       <canvas
         ref={canvasRef}
         aria-label={`${sample ? "Sample " : ""}${series.map((item) => item.label).join(" and ")} depth profile`}

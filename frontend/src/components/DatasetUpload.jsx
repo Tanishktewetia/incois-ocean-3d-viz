@@ -31,43 +31,43 @@ function DatasetUpload({ dataSource, upload, onDataSourceChange, onUpload }) {
   }
 
   return (
-    <section
-      aria-labelledby="dataset-source-title"
-      style={{ padding: "12px 16px", marginBottom: "16px", border: "1px solid #526978" }}
-    >
-      <h2 id="dataset-source-title">Dataset source</h2>
-      <label style={{ marginRight: "16px" }}>
+    <section className="data-card" aria-labelledby="dataset-source-title">
+      <p className="eyebrow">Source control</p>
+      <h3 id="dataset-source-title">Dataset source</h3>
+      <p>Switch between the bundled model and a validated researcher dataset.</p>
+      <div className="source-options">
+      <label className="source-option" title="Use the local Copernicus Marine India EEZ subset">
         <input
           type="radio"
           name="dataset-source"
           value="demo"
+          aria-label="Use Copernicus Marine India EEZ forecast subset"
           checked={dataSource === "demo"}
           onChange={() => onDataSourceChange("demo")}
-        />{" "}
-        Copernicus Marine ocean model data (India EEZ)
+        />
+        <span><strong>Copernicus Marine</strong><br />India EEZ forecast subset</span>
       </label>
-      <label>
+      <label className="source-option" title="Use the most recently validated NetCDF upload">
         <input
           type="radio"
           name="dataset-source"
           value="upload"
+          aria-label="Use the most recently validated NetCDF upload"
           checked={dataSource === "upload"}
           disabled={!upload}
           onChange={() => onDataSourceChange("upload")}
-        />{" "}
-        My upload
+        />
+        <span><strong>My upload</strong><br />{upload ? upload.filename : "Upload a file to enable"}</span>
       </label>
-      <form onSubmit={handleSubmit} style={{ marginTop: "12px" }}>
-        <label>
-          Scientist NetCDF (`thetao`):{" "}
-          <input ref={fileInputRef} type="file" accept=".nc,application/x-netcdf" />
-        </label>{" "}
-        <button type="submit" disabled={status === "uploading"}>
+      </div>
+      <form className="upload-form" onSubmit={handleSubmit}>
+        <input className="file-input" ref={fileInputRef} aria-label="Scientist NetCDF file containing thetao" title="Choose a CF-style NetCDF file containing thetao" type="file" accept=".nc,application/x-netcdf" />
+        <button className="primary-button" type="submit" disabled={status === "uploading"} title="Validate and use this NetCDF dataset">
           {status === "uploading" ? "Uploading…" : "Upload and use"}
         </button>
       </form>
-      <p>Maximum 100 MiB. Required dimensions: time, depth, latitude, longitude.</p>
-      {message && <p role={status === "error" ? "alert" : "status"}>{message}</p>}
+      <p className="upload-help">Maximum 100 MiB · `thetao` · time, depth, latitude, longitude.</p>
+      {message && <p className="upload-message" role={status === "error" ? "alert" : "status"}>{message}</p>}
     </section>
   );
 }

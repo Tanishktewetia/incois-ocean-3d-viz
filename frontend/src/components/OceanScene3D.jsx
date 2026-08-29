@@ -12,7 +12,6 @@ import {
 } from "../utils/currentParticles.js";
 import { createIsosurface } from "../utils/isosurface.js";
 
-const SCENE_HEIGHT = 560;
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
 const VARIABLE_LABELS = {
@@ -56,6 +55,11 @@ function createOceanScene(
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.target.set(0, 0, 0);
+  controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+  controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
+  controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+  const initialCameraPosition = camera.position.clone();
+  const initialTarget = controls.target.clone();
 
   const longitudeSpan = payload.longitudes.at(-1) - payload.longitudes[0];
   const latitudeSpan = payload.latitudes.at(-1) - payload.latitudes[0];
@@ -171,8 +175,9 @@ function createOceanScene(
 
   function resize() {
     const width = Math.max(container.clientWidth, 320);
-    renderer.setSize(width, SCENE_HEIGHT, false);
-    camera.aspect = width / SCENE_HEIGHT;
+    const height = Math.max(container.clientHeight, 420);
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
   }
 
@@ -190,6 +195,22 @@ function createOceanScene(
   animate();
 
   return {
+    cameraAction(action) {
+      const offset = camera.position.clone().sub(controls.target);
+      if (action === "rotate") {
+        offset.applyAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 12);
+        camera.position.copy(controls.target).add(offset);
+      } else if (action === "pan") {
+        camera.position.x += 0.8;
+        controls.target.x += 0.8;
+      } else if (action === "zoom") {
+        camera.position.copy(controls.target).add(offset.multiplyScalar(0.82));
+      } else if (action === "reset") {
+        camera.position.copy(initialCameraPosition);
+        controls.target.copy(initialTarget);
+      }
+      controls.update();
+    },
     setCurrentField(field) {
       currentParticles.setField(field);
     },
@@ -529,124 +550,36 @@ function OceanScene3D({ dataSource }) {
     setScale(nextScale);
   }, [range]);
 
+  const unit = displayUnit(payload);
   return (
-    <section aria-labelledby="ocean-scene-title">
-      <h2 id="ocean-scene-title">3D {VARIABLE_LABELS[variable].toLowerCase()} depth stack</h2>
-      <p>Drag to rotate · Scroll to zoom</p>
-      {range && (
-        <VisualizationControls
-          variable={variable}
-          onVariableChange={setVariable}
-          minimum={range.minimum}
-          maximum={range.maximum}
-          unit={displayUnit(payload)}
-          onRangeChange={handleRangeChange}
-          scale={scale}
-          onScaleChange={handleScaleChange}
-          opacity={opacity}
-          onOpacityChange={setOpacity}
-          verticalExaggeration={verticalExaggeration}
-          onVerticalExaggerationChange={setVerticalExaggeration}
-          isosurfaceEnabled={isosurfaceEnabled}
-          onIsosurfaceEnabledChange={setIsosurfaceEnabled}
-          isosurfaceThreshold={isosurfaceThreshold}
-          onIsosurfaceThresholdChange={setIsosurfaceThreshold}
-          uploadSelected={dataSource === "upload"}
-          error={controlsError}
-        />
-      )}
-      {!payload && !error && <p>Loading eight Copernicus Marine depth layers…</p>}
-      {error && <p role="alert">{error}</p>}
-      {payload && selectedTimeIndex !== null && (
-        <DepthTimeSlider
-          depths={payload.layers.map((layer) => layer.depth)}
-          selectedDepthIndex={selectedDepthIndex}
-          onDepthChange={setSelectedDepthIndex}
-          times={times}
-          selectedTimeIndex={selectedTimeIndex}
-          onTimeChange={handleTimeChange}
-          isUpdating={isUpdating}
-        />
-      )}
-      {payload && (
-        <div
-          style={{
-            margin: "0 0 16px",
-            padding: "12px 16px",
-            border: "1px solid #526978",
-            background: "#102430",
-          }}
-        >
-          <label>
-            <input
-              type="checkbox"
-              checked={particlesEnabled}
-              disabled={dataSource === "upload"}
-              onChange={(event) => setParticlesEnabled(event.target.checked)}
-            />{" "}
-            <strong>Animate real surface currents</strong>
-          </label>
-          <span aria-live="polite" style={{ marginLeft: "12px" }}>
-            {currentStatus === "loading" && "Loading uo/vo vectors…"}
-            {currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)} · ${currentField.depth.toFixed(2)} m`}
-            {currentStatus === "error" && "Current vectors unavailable."}
-            {currentStatus === "off" && "Off"}
-            {dataSource === "upload" && " · currents use Copernicus Marine surface-current data (uo/vo)"}
-          </span>
-          {currentStatus === "ready" && (
-            <div style={{ marginTop: "6px" }}>
-              Motion follows Copernicus eastward (uo) and northward (vo) velocity in {currentField.unit}.
-            </div>
-          )}
+    <section className="ocean-workspace" aria-labelledby="ocean-scene-title">
+      <aside className="control-sidebar" aria-label="Visualization controls">
+        <div className="panel-header"><h2>Visual controls</h2><span className="step-label">01 · Configure</span></div>
+        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} uploadSelected={dataSource === "upload"} error={controlsError} />}
+        {payload && selectedTimeIndex !== null && <DepthTimeSlider depths={payload.layers.map((layer) => layer.depth)} selectedDepthIndex={selectedDepthIndex} onDepthChange={setSelectedDepthIndex} times={times} selectedTimeIndex={selectedTimeIndex} onTimeChange={handleTimeChange} isUpdating={isUpdating} />}
+        {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p></section>}
+      </aside>
+
+      <article className="scene-panel">
+        <header className="scene-topbar"><div><h2 id="ocean-scene-title">3D {VARIABLE_LABELS[variable]} volume</h2><p>{dataSource === "demo" ? "Copernicus Marine · India EEZ" : "Scientist-uploaded NetCDF"}</p></div><div className="live-badge"><span />Data linked</div></header>
+        <div className="scene-stage">
+          <div ref={containerRef} className="scene-container" role="img" aria-label={`Rotatable ${VARIABLE_LABELS[variable].toLowerCase()} stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers`} />
+          {(!payload || isUpdating) && !error && <div className="loading-overlay"><div className="loading-content"><div className="loading-ring" /><strong>{payload ? "Updating the water column" : "Building the ocean volume"}</strong><span>Reading real model layers…</span></div></div>}
+          {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
+          {payload && <div className="region-map" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><header><span>Region</span><span>Model extent</span></header><div className="region-box"><div className="region-extent" /></div><div className="region-coords"><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E</span><span>{payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div></div>}
+          <div className="guided-hint">Click a marker to compare its observed profile with the model. Left drag rotates; middle drag pans.</div>
+          {hoveredInstrument && <div role="tooltip" className="scene-tooltip" style={{ borderColor: hoveredInstrument.data_status === "sample" ? "#d47cff" : undefined }}><strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>{hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}<div>{hoveredInstrument.variables.join(", ")}</div></div>}
         </div>
-      )}
-      <div style={{ position: "relative" }}>
-        <div
-          ref={containerRef}
-          role="img"
-          aria-label={`Rotatable ${VARIABLE_LABELS[variable].toLowerCase()} stack with Core Argo, BGC-Argo, and labelled sample Glider and CTD markers`}
-          style={{
-            display: payload ? "block" : "none",
-            width: "100%",
-            minHeight: `${SCENE_HEIGHT}px`,
-            overflow: "hidden",
-            border: "1px solid #526978",
-            background: "#07131d",
-          }}
-        />
-        {hoveredInstrument && (
-          <div
-            role="tooltip"
-            style={{
-              position: "absolute",
-              left: "12px",
-              top: "12px",
-              padding: "8px 10px",
-              background: "rgba(7, 19, 29, 0.94)",
-              border: `1px solid ${hoveredInstrument.data_status === "sample" ? "#d47cff" : "#8fb4c8"}`,
-              pointerEvents: "none",
-            }}
-          >
-            <strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>
-            {hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}
-            <div>{hoveredInstrument.variables.join(", ")}</div>
-          </div>
-        )}
-      </div>
-      {payload && range && (
-        <p>
-          Depths: {payload.layers.map((layer) => layer.depth.toFixed(0)).join(", ")} m
-          {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} {displayUnit(payload)}
-          {" · "}{scale === "log" ? "Logarithmic" : "Linear"} color scale
-          {" · Selected: "}{payload.layers[selectedDepthIndex].depth.toFixed(0)} m
-          {" · "}{payload.time.slice(0, 10)}
-          {" · "}{payload.source === "demo" ? `Copernicus Marine ${VARIABLE_LABELS[variable].toLowerCase()} data (India EEZ)` : "My upload"}
-        </p>
-      )}
-      <InstrumentOverlay
-        selectedInstrumentId={selectedInstrumentId}
-        onInstrumentsLoaded={handleInstrumentsLoaded}
-      />
+        <div className="scene-toolbar" aria-label="3D camera controls">
+          <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("rotate")} title="Rotate the camera around the data"><span aria-hidden="true">↻</span>Rotate</button>
+          <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("pan")} title="Pan right; middle-mouse drag pans freely"><span aria-hidden="true">↔</span>Pan</button>
+          <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("zoom")} title="Zoom closer; the scroll wheel also zooms"><span aria-hidden="true">＋</span>Zoom</button>
+          <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("reset")} title="Reset the camera to the default view"><span aria-hidden="true">⌂</span>Reset</button>
+        </div>
+        {payload && range && <div className="scene-metadata"><span>Selected depth <strong>{payload.layers[selectedDepthIndex].depth.toFixed(0)} m</strong></span><span>Range <strong>{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} {unit}</strong></span><span>Scale <strong>{scale}</strong></span><span>Model date <strong>{payload.time.slice(0, 10)}</strong></span></div>}
+      </article>
+
+      <aside className="instrument-panel" aria-label="Observation comparison"><div className="panel-header"><h3>Observation profile</h3><span className="step-label">02 · Validate</span></div><div className="instrument-content"><InstrumentOverlay selectedInstrumentId={selectedInstrumentId} onInstrumentsLoaded={handleInstrumentsLoaded} /></div></aside>
     </section>
   );
 }

@@ -51,27 +51,22 @@ function HeatmapCanvas({ dataSource }) {
   }, [slice]);
 
   if (error) {
-    return <p role="alert">{error}</p>;
+    return <section className="data-card"><p className="control-error" role="alert">{error}</p></section>;
   }
 
   return (
-    <section aria-labelledby="heatmap-title">
-      <h2 id="heatmap-title">Surface temperature</h2>
+    <section className="data-card" aria-labelledby="heatmap-title">
+      <p className="eyebrow">2D source check</p>
+      <h3 id="heatmap-title">Surface temperature grid</h3>
       {!slice && <p>Loading {dataSource === "demo" ? "Copernicus Marine" : "uploaded"} data…</p>}
       <canvas
         ref={canvasRef}
         role="img"
         aria-label="Sea surface temperature heatmap of the India EEZ bounding box"
-        style={{
-          display: slice ? "block" : "none",
-          width: "min(100%, 900px)",
-          height: "auto",
-          border: "1px solid #526978",
-          background: "#0c1820",
-        }}
+        className={`heatmap-canvas ${slice ? "" : "hidden"}`}
       />
       {slice && range && (
-        <p>
+        <p className="heatmap-meta">
           {slice.latitudes[0].toFixed(1)}–{slice.latitudes.at(-1).toFixed(1)}°N,
           {" "}{slice.longitudes[0].toFixed(1)}–{slice.longitudes.at(-1).toFixed(1)}°E
           {" · "}{slice.depth.toFixed(2)} m

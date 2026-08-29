@@ -1,132 +1,59 @@
 const VARIABLES = [
-  ["thetao", "Temperature"],
-  ["so", "Salinity"],
-  ["current_magnitude", "Current magnitude"],
+  ["thetao", "Temperature", "°C", "T"],
+  ["so", "Salinity", "PSU", "S"],
+  ["current_magnitude", "Currents", "m/s", "↗"],
 ];
 
+function Tip({ text }) {
+  return <span className="info-tip" title={text} aria-label={text}>i</span>;
+}
+
 function VisualizationControls({
-  variable,
-  onVariableChange,
-  minimum,
-  maximum,
-  unit,
-  onRangeChange,
-  scale,
-  onScaleChange,
-  opacity,
-  onOpacityChange,
-  verticalExaggeration,
-  onVerticalExaggerationChange,
-  isosurfaceEnabled,
-  onIsosurfaceEnabledChange,
-  isosurfaceThreshold,
-  onIsosurfaceThresholdChange,
-  uploadSelected,
-  error,
+  variable, onVariableChange, minimum, maximum, unit, onRangeChange,
+  scale, onScaleChange, opacity, onOpacityChange, verticalExaggeration,
+  onVerticalExaggerationChange, isosurfaceEnabled, onIsosurfaceEnabledChange,
+  isosurfaceThreshold, onIsosurfaceThresholdChange, uploadSelected, error,
 }) {
   return (
-    <fieldset style={{ margin: "0 0 16px", padding: "12px 16px", border: "1px solid #526978" }}>
-      <legend><strong>Variable and visualization controls</strong></legend>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 20px", alignItems: "end" }}>
-        <label>
-          Variable<br />
-          <select value={variable} onChange={(event) => onVariableChange(event.target.value)}>
-            {VARIABLES.map(([value, label]) => (
-              <option key={value} value={value} disabled={uploadSelected && value !== "thetao"}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Color minimum<br />
-          <input
-            aria-label="Colorbar minimum"
-            type="number"
-            step="any"
-            value={minimum}
-            onChange={(event) => onRangeChange("minimum", event.target.value)}
-          />
-        </label>
-        <label>
-          Color maximum<br />
-          <input
-            aria-label="Colorbar maximum"
-            type="number"
-            step="any"
-            value={maximum}
-            onChange={(event) => onRangeChange("maximum", event.target.value)}
-          />
-        </label>
-        <label>
-          Scale<br />
-          <select value={scale} onChange={(event) => onScaleChange(event.target.value)}>
-            <option value="linear">Linear</option>
-            <option value="log">Logarithmic</option>
-          </select>
-        </label>
-        <label>
-          Layer opacity: {Math.round(opacity * 100)}%<br />
-          <input
-            aria-label="Layer opacity"
-            type="range"
-            min="0.05"
-            max="1"
-            step="0.05"
-            value={opacity}
-            onChange={(event) => onOpacityChange(Number(event.target.value))}
-          />
-        </label>
-        <label>
-          Vertical exaggeration: {verticalExaggeration.toFixed(1)}×<br />
-          <input
-            aria-label="Vertical exaggeration"
-            type="range"
-            min="0.5"
-            max="4"
-            step="0.1"
-            value={verticalExaggeration}
-            onChange={(event) => onVerticalExaggerationChange(Number(event.target.value))}
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={isosurfaceEnabled}
-            onChange={(event) => onIsosurfaceEnabledChange(event.target.checked)}
-          />{" "}
-          True isosurface
-        </label>
-        <label>
-          Isosurface threshold: {isosurfaceThreshold.toFixed(2)} {unit}<br />
-          <input
-            aria-label="Isosurface threshold"
-            type="range"
-            min={minimum}
-            max={maximum}
-            step={(maximum - minimum) / 200}
-            value={isosurfaceThreshold}
-            disabled={!isosurfaceEnabled}
-            onChange={(event) => onIsosurfaceThresholdChange(Number(event.target.value))}
-          />
-        </label>
-      </div>
-      <div style={{ marginTop: "12px", maxWidth: "420px" }} aria-label={`Colorbar from ${minimum} to ${maximum} ${unit}`}>
-        <div
-          style={{
-            height: "14px",
-            background: "linear-gradient(90deg, rgb(0, 29, 108), rgb(0, 170, 220), rgb(255, 224, 92), rgb(205, 38, 38))",
-            border: "1px solid #8fb4c8",
-          }}
-        />
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>{minimum} {unit}</span>
-          <span>{maximum} {unit}</span>
+    <>
+      <section className="control-section" aria-labelledby="variable-control-title">
+        <div className="control-kicker" id="variable-control-title">Variable <Tip text="Choose the model field rendered through the water column." /></div>
+        <div className="variable-buttons">
+          {VARIABLES.map(([value, label, variableUnit, icon]) => (
+            <button className={`variable-button ${variable === value ? "active" : ""}`} type="button" key={value} disabled={uploadSelected && value !== "thetao"} onClick={() => onVariableChange(value)} title={`Render ${label.toLowerCase()} (${variableUnit})`} aria-pressed={variable === value}>
+              <span className="variable-icon" aria-hidden="true">{icon}</span><span>{label}<small>{variableUnit}</small></span>
+            </button>
+          ))}
         </div>
-      </div>
-      {uploadSelected && <p>Salinity and current magnitude require the bundled Copernicus dataset.</p>}
-      {error && <p role="alert" style={{ color: "#ffb3b3" }}>{error}</p>}
-    </fieldset>
+        {uploadSelected && <p className="status-copy">Uploads provide temperature only; other fields use Copernicus Marine.</p>}
+      </section>
+
+      <section className="control-section" aria-labelledby="color-control-title">
+        <div className="control-kicker" id="color-control-title">Color range <Tip text="Set the real data values mapped from blue through red." /></div>
+        <div className="colorbar" aria-label={`Colorbar from ${minimum} to ${maximum} ${unit}`} />
+        <div className="range-fields">
+          <label className="range-field">Minimum<div className="range-input-wrap"><input aria-label="Colorbar minimum" type="number" step="any" value={minimum} onChange={(event) => onRangeChange("minimum", event.target.value)} /><span>{unit}</span></div></label>
+          <label className="range-field">Maximum<div className="range-input-wrap"><input aria-label="Colorbar maximum" type="number" step="any" value={maximum} onChange={(event) => onRangeChange("maximum", event.target.value)} /><span>{unit}</span></div></label>
+        </div>
+        <div className="segmented" aria-label="Color scale">
+          <button className={scale === "linear" ? "active" : ""} type="button" onClick={() => onScaleChange("linear")} title="Use even value intervals">Linear</button>
+          <button className={scale === "log" ? "active" : ""} type="button" onClick={() => onScaleChange("log")} title="Emphasize proportional differences">Log</button>
+        </div>
+      </section>
+
+      <section className="control-section" aria-labelledby="render-control-title">
+        <div className="control-kicker" id="render-control-title">Rendering <Tip text="Adjust layer visibility and vertical spacing without altering source values." /></div>
+        <label className="slider-control"><span className="slider-label">Layer opacity <output>{Math.round(opacity * 100)}%</output></span><input aria-label="Layer opacity" title="Set transparency of depth layers" type="range" min="0.05" max="1" step="0.05" value={opacity} onChange={(event) => onOpacityChange(Number(event.target.value))} /><span className="range-endpoints"><span>5%</span><span>100%</span></span></label>
+        <label className="slider-control"><span className="slider-label">Vertical exaggeration <output>{verticalExaggeration.toFixed(1)}×</output></span><input aria-label="Vertical exaggeration" title="Stretch depth spacing for interpretation; values are unchanged" type="range" min="0.5" max="4" step="0.1" value={verticalExaggeration} onChange={(event) => onVerticalExaggerationChange(Number(event.target.value))} /><span className="range-endpoints"><span>0.5×</span><span>4×</span></span></label>
+      </section>
+
+      <section className="control-section" aria-labelledby="surface-control-title">
+        <div className="control-kicker" id="surface-control-title">Volume analysis <Tip text="Extract a true data-derived surface at one threshold value." /></div>
+        <label className="toggle-row" title="Show a marching-cubes surface extracted from the loaded volume"><span>True isosurface</span><input aria-label="Show true isosurface" type="checkbox" checked={isosurfaceEnabled} onChange={(event) => onIsosurfaceEnabledChange(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label>
+        <label className="slider-control"><span className="slider-label">Threshold <output>{isosurfaceThreshold.toFixed(2)} {unit}</output></span><input aria-label="Isosurface threshold" title="Choose the value represented by the extracted surface" type="range" min={minimum} max={maximum} step={(maximum - minimum) / 200} value={isosurfaceThreshold} disabled={!isosurfaceEnabled} onChange={(event) => onIsosurfaceThresholdChange(Number(event.target.value))} /></label>
+        {error && <p className="control-error" role="alert">{error}</p>}
+      </section>
+    </>
   );
 }
 
