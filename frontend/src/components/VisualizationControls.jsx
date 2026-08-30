@@ -6,6 +6,11 @@ const VARIABLES = [
   ["current_magnitude", "Currents", "m/s", "↗"],
 ];
 const VIEW_MODES = [["composite", "Composite"], ["bathymetry", "Bathymetry only"], ["depth", "Selected depth layer only"], ["isosurface", "Isosurface only"], ["instruments", "Instruments only"]];
+const FIGURE_MODES = [
+  ["volume", "Layered ocean volume", "Depth layers, seafloor, observations, and optional flows"],
+  ["relief", "Field relief surface", "Selected depth shown as an interactive value-height surface"],
+  ["section", "Vertical section", "Center-latitude longitude–depth section through every layer"],
+];
 
 function VisualizationControls({
   variable, onVariableChange, minimum, maximum, unit, onRangeChange,
@@ -13,7 +18,7 @@ function VisualizationControls({
   onVerticalExaggerationChange, isosurfaceEnabled, onIsosurfaceEnabledChange,
   isosurfaceThreshold, onIsosurfaceThresholdChange, uploadSelected, error,
   backgroundColor, onBackgroundColorChange, onInfoOpen,
-  viewMode, onViewModeChange,
+  viewMode, onViewModeChange, figureMode, onFigureModeChange,
 }) {
   return (
     <>
@@ -30,12 +35,19 @@ function VisualizationControls({
       </section>
 
       <section className="control-section" aria-labelledby="view-control-title">
-        <div className="control-kicker" id="view-control-title">View</div>
-        <label className="view-select-label" htmlFor="layer-view-mode">Focus the existing 3D scene</label>
-        <select id="layer-view-mode" className="view-select" value={viewMode} onChange={(event) => onViewModeChange(event.target.value)} aria-label="3D layer isolation view">
+        <div className="control-kicker" id="view-control-title">3D figure</div>
+        <div className="figure-buttons" role="group" aria-label="3D figure selection">
+          {FIGURE_MODES.map(([value, label, description], index) => (
+            <button className={`figure-button ${figureMode === value ? "active" : ""}`} type="button" key={value} onClick={() => onFigureModeChange(value)} aria-pressed={figureMode === value}>
+              <span aria-hidden="true">0{index + 1}</span><strong>{label}</strong><small>{description}</small>
+            </button>
+          ))}
+        </div>
+        <label className="view-select-label" htmlFor="layer-view-mode">Volume layer focus</label>
+        <select id="layer-view-mode" className="view-select" value={viewMode} disabled={figureMode !== "volume"} onChange={(event) => onViewModeChange(event.target.value)} aria-label="3D layer isolation view">
           {VIEW_MODES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
         </select>
-        <p className="status-copy">Visibility only — camera and data stay unchanged.</p>
+        <p className="status-copy">One figure at a time · same loaded model values and camera controls.</p>
       </section>
 
       <section className="control-section" aria-labelledby="color-control-title">

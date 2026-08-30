@@ -1,5 +1,14 @@
 # Phase Log
 
+## Phase 19 — Interactive real-data 3D figures
+
+- **Status:** Complete
+- **Files changed:** `frontend/src/components/OceanScene3D.jsx`, `frontend/src/components/VisualizationControls.jsx`, `frontend/src/styles.css`, `PHASE_LOG.md`.
+- **Implementation:** Added three mutually exclusive interactive figures to the Explorer’s existing Three.js scene: the established layered volume, a selected-depth field-relief surface whose vertex elevation and color come from the loaded scalar grid, and a center-latitude longitude–depth section assembled from all loaded model layers. Variable, model date, selected depth, color range/scale, camera, and vertical exaggeration continue to operate on the relevant active figure. Missing section cells are omitted rather than interpolated as ocean data.
+- **Performance and provenance:** Figure switching changes object visibility inside one renderer and one canvas; it does not mount parallel WebGL contexts. Figures use the existing real Copernicus/API payload (or a researcher upload where supported), and the existing GEBCO/observation/current overlays remain in the volume figure. Generated geometry and materials are disposed when rebuilt and when the component unmounts.
+- **Manual test:** Start the backend and frontend, open `/explorer`, and select each item under **3D figure**. Confirm only one figure is visible, orbit/pan/zoom work, depth changes reshape the relief figure, date/variable changes update all figures, and vertical exaggeration stretches the section. Confirm volume layer focus, observations, currents, isosurface, fullscreen, and `/`, `/about`, and `/comparison` still work.
+- **Automated validation:** The frontend production build passes with only the existing non-fatal Vite large-chunk advisory; all 29 backend unit tests pass; `git diff --check` passes. Static checks confirm three figure choices and exactly one `THREE.WebGLRenderer` constructor.
+
 ## Phase 0 — Scaffolding
 
 - **Status:** Complete
