@@ -1,5 +1,14 @@
 # Phase Log
 
+## Isotherm Contour Toggle
+
+- **Status:** Complete.
+- **Implementation:** Added an off-by-default `Isotherm contours` toggle for the temperature figures. When enabled, fixed 2 °C contour lines are generated with marching-squares-style edge interpolation from the loaded temperature grid for each volume depth and the selected-depth relief surface.
+- **Scope:** No data loading, API calls, or source values changed. Contours are hidden for salinity/current selections, and existing layer highlighting, color mapping, depth exaggeration, isosurface, and figure controls remain unchanged.
+- **Files changed:** `frontend/src/components/OceanScene3D.jsx`, `frontend/src/components/VisualizationControls.jsx`, `frontend/src/styles.css`, `PHASE_LOG.md`.
+- **Manual verification:** Open `/explorer`, keep Temperature selected, and confirm `Isotherm contours · 2 °C interval` is off by default. Enable it in Layered ocean volume and verify thin lines appear at 2 °C intervals across loaded depths. Switch to Field relief surface and verify contours follow the selected-depth surface. Change highlighted depth, variable, date, range, and vertical exaggeration; confirm contours rebuild from the current real temperature values and disappear for salinity/current.
+- **Automated validation:** Frontend production build passes with only the existing non-fatal Vite large-chunk advisory; `git diff --check` passes.
+
 ## Phase 19 - Real Satellite Imagery on Land
 
 - **Status:** Complete.

@@ -42,6 +42,7 @@ function createOceanScene(
   verticalExaggeration,
   isosurfaceEnabled,
   isosurfaceThreshold,
+  isothermContoursEnabled,
   backgroundColor,
   onInstrumentSelect,
   onInstrumentHover,
@@ -186,6 +187,7 @@ function createOceanScene(
   let sceneViewMode = "composite";
   let sceneFigureMode = "volume";
   let sceneIsosurfaceEnabled = isosurfaceEnabled;
+  let sceneIsothermContoursEnabled = isothermContoursEnabled;
   let sceneParticlesEnabled = false;
   let selectedDepthIndex = 0;
   let layerOpacity = opacity;
@@ -204,6 +206,87 @@ function createOceanScene(
   function fieldColor(value) {
     const [red, green, blue] = interpolateColor(value, sceneRange.minimum, sceneRange.maximum, sceneScale);
     return [red / 255, green / 255, blue / 255];
+  }
+
+  const volumeContourGroup = new THREE.Group();
+  const reliefContourGroup = new THREE.Group();
+  scene.add(volumeContourGroup, reliefContourGroup);
+
+  function clearContourGroup(group) {
+    group.children.forEach((object) => {
+      object.geometry.dispose();
+      object.material.dispose();
+    });
+    group.clear();
+  }
+
+  function contourLineForLayer(layer, zForValue) {
+    const rows = layer.values.length;
+    const columns = layer.values[0]?.length || 0;
+    const values = layer.values.flat().filter(Number.isFinite);
+    if (!values.length || columns < 2 || rows < 2) return null;
+    const minimum = Math.ceil(Math.min(...values) / 2) * 2;
+    const maximum = Math.floor(Math.max(...values) / 2) * 2;
+    const positions = [];
+    const stride = 3;
+    const point = (row, column, value) => ({
+      x: (column / (columns - 1) - 0.5) * PLANE_WIDTH,
+      y: (row / (rows - 1) - 0.5) * planeHeight,
+      z: zForValue(value),
+    });
+    for (let level = minimum; level <= maximum; level += 2) {
+      for (let row = 0; row < rows - 1; row += stride) {
+        for (let column = 0; column < columns - 1; column += stride) {
+          const nextRow = Math.min(rows - 1, row + stride);
+          const nextColumn = Math.min(columns - 1, column + stride);
+          const corners = [
+            [point(row, column, layer.values[row][column]), layer.values[row][column]],
+            [point(row, nextColumn, layer.values[row][nextColumn]), layer.values[row][nextColumn]],
+            [point(nextRow, nextColumn, layer.values[nextRow][nextColumn]), layer.values[nextRow][nextColumn]],
+            [point(nextRow, column, layer.values[nextRow][column]), layer.values[nextRow][column]],
+          ];
+          if (!corners.every((corner) => Number.isFinite(corner[1]))) continue;
+          const intersections = [];
+          for (let edge = 0; edge < corners.length; edge += 1) {
+            const [firstPoint, firstValue] = corners[edge];
+            const [secondPoint, secondValue] = corners[(edge + 1) % corners.length];
+            if ((firstValue < level && secondValue >= level) || (secondValue < level && firstValue >= level)) {
+              const fraction = (level - firstValue) / (secondValue - firstValue);
+              intersections.push({
+                x: firstPoint.x + (secondPoint.x - firstPoint.x) * fraction,
+                y: firstPoint.y + (secondPoint.y - firstPoint.y) * fraction,
+                z: zForValue(level),
+              });
+            }
+          }
+          if (intersections.length === 2) {
+            positions.push(intersections[0].x, intersections[0].y, intersections[0].z, intersections[1].x, intersections[1].y, intersections[1].z);
+          }
+        }
+      }
+    }
+    if (!positions.length) return null;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    return new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xd9fbff, transparent: true, opacity: 0.76 }));
+  }
+
+  function rebuildIsothermContours() {
+    clearContourGroup(volumeContourGroup);
+    clearContourGroup(reliefContourGroup);
+    if (scenePayload.variable !== "thetao") return;
+    scenePayload.layers.forEach((layer) => {
+      const line = contourLineForLayer(layer, () => 0);
+      if (line) {
+        line.position.z = STACK_HEIGHT / 2 - (layer.depth / maximumDepth) * STACK_HEIGHT * sceneVerticalExaggeration;
+        volumeContourGroup.add(line);
+      }
+    });
+    const reliefLayer = scenePayload.layers[selectedDepthIndex];
+    const span = Math.max(Number.EPSILON, sceneRange.maximum - sceneRange.minimum);
+    const reliefLine = contourLineForLayer(reliefLayer, (value) => ((value - sceneRange.minimum) / span - 0.5) * 2.4 + 0.012);
+    if (reliefLine) reliefContourGroup.add(reliefLine);
+    applyViewMode();
   }
 
   function rebuildReliefFigure() {
@@ -251,6 +334,9 @@ function createOceanScene(
       plane.position.z = STACK_HEIGHT / 2
         - (payload.layers[index].depth / maximumDepth) * STACK_HEIGHT * exaggeration;
     });
+    volumeContourGroup.children.forEach((contour, index) => {
+      contour.position.z = STACK_HEIGHT / 2 - (scenePayload.layers[index].depth / maximumDepth) * STACK_HEIGHT * exaggeration;
+    });
     frame.scale.z = exaggeration;
     frame.position.z = STACK_HEIGHT / 2 - (STACK_HEIGHT * exaggeration) / 2;
     isosurface.setVerticalExaggeration(exaggeration);
@@ -267,9 +353,15 @@ function createOceanScene(
     currentParticles.points.visible = volumeVisible && sceneViewMode === "composite" && sceneParticlesEnabled;
     frame.visible = volumeVisible && sceneViewMode === "composite";
     if (reliefMesh) reliefMesh.visible = sceneFigureMode === "relief";
+    volumeContourGroup.visible = volumeVisible && sceneIsothermContoursEnabled && scenePayload.variable === "thetao";
+    volumeContourGroup.children.forEach((contour, index) => {
+      contour.visible = volumeContourGroup.visible && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
+    });
+    reliefContourGroup.visible = sceneFigureMode === "relief" && sceneIsothermContoursEnabled && scenePayload.variable === "thetao";
   }
   positionDepthLayers(verticalExaggeration);
   rebuildReliefFigure();
+  rebuildIsothermContours();
 
   function handlePointerClick(event) {
     const bounds = renderer.domElement.getBoundingClientRect();
@@ -489,6 +581,7 @@ function createOceanScene(
       });
       isosurface.updateVolume(nextPayload, nextRange);
       rebuildReliefFigure();
+      rebuildIsothermContours();
     },
     setOpacity(nextOpacity) {
       layerOpacity = nextOpacity;
@@ -510,9 +603,14 @@ function createOceanScene(
     setIsosurfaceThreshold(threshold) {
       isosurface.setThreshold(threshold);
     },
+    setIsothermContoursVisible(visible) {
+      sceneIsothermContoursEnabled = visible;
+      applyViewMode();
+    },
     highlightDepth(selectedIndex) {
       selectedDepthIndex = selectedIndex;
       rebuildReliefFigure();
+      rebuildIsothermContours();
       materials.forEach((material, index) => {
         material.opacity = index === selectedIndex
           ? layerOpacity
@@ -581,6 +679,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [verticalExaggeration, setVerticalExaggeration] = useState(1);
   const [isosurfaceEnabled, setIsosurfaceEnabled] = useState(false);
   const [isosurfaceThreshold, setIsosurfaceThreshold] = useState(0);
+  const [isothermContoursEnabled, setIsothermContoursEnabled] = useState(false);
   const [controlsError, setControlsError] = useState("");
   const [times, setTimes] = useState([]);
   const [selectedDepthIndex, setSelectedDepthIndex] = useState(0);
@@ -703,6 +802,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         verticalExaggeration,
         isosurfaceEnabled,
         isosurfaceThreshold,
+        isothermContoursEnabled,
         backgroundColor,
         setSelectedInstrumentId,
         setHoveredInstrument,
@@ -755,6 +855,10 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   useEffect(() => {
     sceneApiRef.current?.setIsosurfaceThreshold(isosurfaceThreshold);
   }, [isosurfaceThreshold]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setIsothermContoursVisible(isothermContoursEnabled);
+  }, [isothermContoursEnabled]);
 
   useEffect(() => {
     sceneApiRef.current?.selectInstrument(selectedInstrumentId);
@@ -922,7 +1026,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         }
       }}>
         <div className="panel-header"><h2>Visual controls</h2><span className="step-label">01 · Configure</span></div>
-        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} uploadSelected={dataSource === "upload"} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} viewMode={viewMode} onViewModeChange={setViewMode} figureMode={figureMode} onFigureModeChange={setFigureMode} />}
+        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} isothermContoursEnabled={isothermContoursEnabled} onIsothermContoursChange={setIsothermContoursEnabled} uploadSelected={dataSource === "upload"} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} viewMode={viewMode} onViewModeChange={setViewMode} figureMode={figureMode} onFigureModeChange={setFigureMode} />}
         {payload && selectedTimeIndex !== null && <DepthTimeSlider depths={payload.layers.map((layer) => layer.depth)} selectedDepthIndex={selectedDepthIndex} onDepthChange={setSelectedDepthIndex} times={times} selectedTimeIndex={selectedTimeIndex} onTimeChange={handleTimeChange} isUpdating={isUpdating} onInfoOpen={setInfoTopic} />}
         {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p><div className="hazard-row"><strong>Cyclone tracking</strong><span className="hazard-status">{cycloneStatus === "loading" ? "Checking GDACS…" : cycloneStatus}</span></div><small className="source-note">Source: GDACS public events API</small></section>}
       </aside>

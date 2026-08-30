@@ -16,6 +16,7 @@ function VisualizationControls({
   scale, onScaleChange, opacity, onOpacityChange, verticalExaggeration,
   onVerticalExaggerationChange, isosurfaceEnabled, onIsosurfaceEnabledChange,
   isosurfaceThreshold, onIsosurfaceThresholdChange, uploadSelected, error,
+  isothermContoursEnabled, onIsothermContoursChange,
   backgroundColor, onBackgroundColorChange, onInfoOpen,
   viewMode, onViewModeChange, figureMode, onFigureModeChange,
 }) {
@@ -74,6 +75,7 @@ function VisualizationControls({
 
       <section className="control-section" aria-labelledby="surface-control-title">
         <div className="control-kicker" id="surface-control-title">Volume analysis <InfoButton topic="volume" onOpen={onInfoOpen} /></div>
+        {variable === "thetao" && <label className="toggle-row" title="Draw contours from the loaded temperature values"><span>Isotherm contours <small className="toggle-unit">2 °C interval</small></span><input aria-label="Show 2 degree Celsius isotherm contours" type="checkbox" checked={isothermContoursEnabled} onChange={(event) => onIsothermContoursChange(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label>}
         <label className="toggle-row" title="Show a marching-cubes surface extracted from the loaded volume"><span>True isosurface</span><input aria-label="Show true isosurface" type="checkbox" checked={isosurfaceEnabled} onChange={(event) => onIsosurfaceEnabledChange(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label>
         <label className="slider-control"><span className="slider-label">Threshold <output>{isosurfaceThreshold.toFixed(2)} {unit}</output></span><input aria-label="Isosurface threshold" title="Choose the value represented by the extracted surface" type="range" min={minimum} max={maximum} step={(maximum - minimum) / 200} value={isosurfaceThreshold} disabled={!isosurfaceEnabled} onChange={(event) => onIsosurfaceThresholdChange(Number(event.target.value))} /></label>
         {error && <p className="control-error" role="alert">{error}</p>}

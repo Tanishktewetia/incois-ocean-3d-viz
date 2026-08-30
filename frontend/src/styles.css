@@ -130,6 +130,7 @@ input[type="range"] { width: 100%; height: 3px; margin: 7px 0; accent-color: var
 .scene-legend-heading span { color: #a8c0ca; text-align: right; }
 .scene-legend-bar { height: 10px; border: 1px solid rgba(255,255,255,.28); border-radius: 5px; background: linear-gradient(90deg, rgb(0,29,108), rgb(0,170,220), rgb(255,224,92), rgb(205,38,38)); }
 .scene-legend-scale { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; color: #d5edf1; font-variant-numeric: tabular-nums; }
+.toggle-unit { margin-left: 5px; color: #628393; font-size: .68rem; font-weight: 600; letter-spacing: .02em; text-transform: none; }
 .figure-button-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 6px; align-items: center; }
 .figure-button-row .figure-button { min-width: 0; }
 .figure-button-row > .info-tip { align-self: start; margin-top: 9px; }
