@@ -4,6 +4,7 @@ import DatasetUpload from "./components/DatasetUpload.jsx";
 import HeatmapCanvas from "./components/HeatmapCanvas.jsx";
 import OceanScene3D from "./components/OceanScene3D.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
+import ComparisonPage from "./pages/ComparisonPage.jsx";
 
 function Brand() {
   return (
@@ -16,13 +17,15 @@ function Brand() {
 
 function AppHeader({ connectionStatus }) {
   const onAboutPage = window.location.pathname === "/about";
+  const onComparisonPage = window.location.pathname === "/comparison";
   const connected = connectionStatus === "Backend connected";
   return (
     <header className="app-header">
       <Brand />
       <nav aria-label="Primary navigation">
-        <a className={!onAboutPage ? "active" : ""} href="/">Explorer</a>
+        <a className={!onAboutPage && !onComparisonPage ? "active" : ""} href="/">Explorer</a>
         <a className={onAboutPage ? "active" : ""} href="/about">Mission & impact</a>
+        <a className={onComparisonPage ? "active" : ""} href="/comparison">Comparison</a>
       </nav>
       <div className={`connection-pill ${connected ? "connected" : ""}`} role="status">
         <span aria-hidden="true" />{connectionStatus}
@@ -47,6 +50,15 @@ function App() {
       <div className="app-shell">
         <AppHeader connectionStatus={connectionStatus} />
         <AboutPage />
+      </div>
+    );
+  }
+
+  if (window.location.pathname === "/comparison") {
+    return (
+      <div className="app-shell">
+        <AppHeader connectionStatus={connectionStatus} />
+        <ComparisonPage />
       </div>
     );
   }

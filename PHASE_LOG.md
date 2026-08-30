@@ -429,3 +429,31 @@
   3. At widths above 1500 px, confirm the profile panel is a substantial third column and its charts are readily readable beside controls and scene. At 1500 px and below, confirm the profile moves below the control/scene pair; below 900 px, confirm all panels stack without horizontal overflow.
   4. Confirm Data Lab appears immediately below the page introduction, reads as a primary workflow, and still switches between demo and uploaded NetCDF sources, uploads a valid file, reports validation feedback, and updates the source-grid preview.
 - **Automated validation:** Frontend production build, backend test suite, Python byte-compilation, and `git diff --check` pass. Vite's existing non-fatal large-chunk advisory remains.
+
+## Phase 14 - Comparison and Justification Page
+
+- **Status:** Complete
+- **Files changed:**
+  - `frontend/src/App.jsx`
+  - `frontend/src/pages/ComparisonPage.jsx`
+  - `frontend/src/styles.css`
+  - `PHASE_LOG.md`
+- **Page:** Added a dedicated `/comparison` route and navigation item. The page contains a source-linked comparison table for Ferret, Ocean Data View, and MATLAB ocean toolboxes; a narrowly-scoped explanation of what the already-built OceanScope Explorer adds; and an OceanScope-owned proof panel that references the working Explorer and OGC routes without reproducing third-party interfaces.
+- **Factual-source policy:** The page uses only the Phase 14 research already recorded in `ARCHITECTURE.md`. No new external claim, statistic, or feature comparison was added. OceanScope statements are limited to features implemented in this repository: browser-native 3D, Argo/BGC-Argo overlays, profile/RMSE comparison, NetCDF upload ingestion, and WMS/WCS routes.
+- **Every external source cited on the page:**
+  - Ferret history: `https://ferret.pmel.noaa.gov/static/Documentation/rostock_paper/paper.html`
+  - Ferret NetCDF documentation: `https://ferret.pmel.noaa.gov/Ferret/documentation/users-guide/data-set-basics/NETCDF-DATA`
+  - Ferret overview: `https://en.wikipedia.org/wiki/Ferret_Data_Visualization_and_Analysis`
+  - Ocean Data View: `https://odv.awi.de/`
+  - ODV format documentation: `https://www.bodc.ac.uk/resources/delivery_formats/odv_format/`
+  - MATLAB Argo Toolbox: `https://www.mathworks.com/matlabcentral/fileexchange/54503-argo-toolbox`
+  - SEA-MAT: `https://sea-mat.github.io/sea-mat/`
+  - MATLAB NetCDF/OPeNDAP/GRIB example: `https://polar.ncep.noaa.gov/global/examples/usingmatlab2.shtml`
+  - `ocean_data_tools`: `https://github.com/lnferris/ocean_data_tools`
+- **Manual test:**
+  1. Start the backend with `backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload`, start the frontend with `npm run dev --prefix frontend`, and open `http://localhost:5173/comparison`.
+  2. Confirm the Comparison navigation item is active and the page follows the existing light Explorer/Mission & Impact visual system.
+  3. Check every comparison-table row: each external statement has one or more linked sources, and the table remains horizontally scrollable at narrow widths.
+  4. Open the Explorer proof link and verify the working 3D scene, instrument markers, profile/RMSE flow, and upload workflow. Open the WMS API reference and verify the capabilities XML from the running backend.
+  5. Resize below 800 px and 520 px and confirm the hero, feature cards, proof panel, table, and CTA remain readable without breaking the page layout.
+- **Automated validation:** Frontend production build passes. `git diff --check` passes. Vite reports only the existing non-fatal large-chunk advisory.
