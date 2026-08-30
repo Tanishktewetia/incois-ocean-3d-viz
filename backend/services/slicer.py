@@ -30,10 +30,21 @@ SUPPORTED_VARIABLES = {"thetao", "so", "current_magnitude"}
 LAYER_DEPTHS = (0, 50, 100, 200, 500, 1000, 1500, 2000)
 CURRENT_GRID_STRIDE = 4
 UPLOAD_DIRECTORY = Path(__file__).resolve().parents[1] / "uploads"
-UPLOAD_DATA_FILE = UPLOAD_DIRECTORY / "scientist_upload.nc"
+UPLOAD_DATA_FILES = {
+    "thetao": UPLOAD_DIRECTORY / "scientist_thetao.nc",
+    "so": UPLOAD_DIRECTORY / "scientist_so.nc",
+    "currents": UPLOAD_DIRECTORY / "scientist_currents.nc",
+}
+UPLOAD_DATA_FILE = UPLOAD_DATA_FILES["thetao"]
 UPLOAD_TEMP_FILE = UPLOAD_DIRECTORY / "scientist_upload.part"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024
 DATA_SOURCES = {"demo", "upload"}
+UPLOAD_TYPES = {"thetao", "so", "currents"}
+
+
+def upload_data_path(dataset_type: str) -> Path:
+    # Keep the legacy thetao path as the compatibility hook used by tests and old installs.
+    return UPLOAD_DATA_FILE if dataset_type == "thetao" else UPLOAD_DATA_FILES[dataset_type]
 
 
 class OceanDataUnavailableError(RuntimeError):
@@ -92,15 +103,16 @@ def get_currents_3d_dataset() -> xr.Dataset:
 
 
 @lru_cache(maxsize=1)
-def get_upload_dataset() -> xr.Dataset:
+def get_upload_dataset(dataset_type: str = "thetao") -> xr.Dataset:
     """Open the latest validated scientist upload once."""
-    if not UPLOAD_DATA_FILE.is_file():
+    path = upload_data_path(dataset_type) if dataset_type in UPLOAD_TYPES else None
+    if path is None or not path.is_file():
         raise OceanDataUnavailableError(
             "No scientist dataset has been uploaded yet."
         )
 
     try:
-        return xr.open_dataset(UPLOAD_DATA_FILE)
+            return xr.open_dataset(path)
     except (OSError, ValueError) as error:
         raise OceanDataUnavailableError(
             "Unable to open the uploaded scientist dataset."
@@ -122,10 +134,23 @@ def select_variable(variable: str, source: str) -> xr.DataArray:
         )
     if source not in DATA_SOURCES:
         raise ValueError("Invalid source. Use 'demo' or 'upload'.")
-    if source == "upload" and variable != "thetao":
-        raise ValueError("Scientist uploads currently support only 'thetao'.")
-
-    if source == "upload" or variable == "thetao":
+    if source == "upload":
+        dataset_type = "currents" if variable == "current_magnitude" else variable
+        try:
+            dataset = get_upload_dataset(dataset_type)
+        except OceanDataUnavailableError as error:
+            raise ValueError(f"No uploaded '{dataset_type}' dataset is available; only 'thetao' is available until that field is uploaded separately.") from error
+        if variable == "current_magnitude":
+            if "uo" not in dataset or "vo" not in dataset:
+                raise OceanDataUnavailableError("Uploaded currents must contain both 'uo' and 'vo'.")
+            data = np.hypot(dataset["uo"], dataset["vo"])
+            data.name = variable
+            data.attrs = {"long_name": "sea water current speed", "units": dataset["uo"].attrs.get("units", "m s-1")}
+        else:
+            if variable not in dataset:
+                raise OceanDataUnavailableError(f"Variable '{variable}' is missing from the selected upload.")
+            data = dataset[variable]
+    elif variable == "thetao":
         dataset = select_dataset(source)
         if variable not in dataset:
             raise OceanDataUnavailableError(
@@ -150,18 +175,22 @@ def select_variable(variable: str, source: str) -> xr.DataArray:
     return data
 
 
-def validate_upload(path: Path) -> dict[str, Any]:
-    """Validate the NetCDF contract consumed by the existing slicer."""
+def validate_upload(path: Path, dataset_type: str = "thetao") -> dict[str, Any]:
+    """Validate one independent model upload against the shared coordinate contract."""
+    if dataset_type not in UPLOAD_TYPES:
+        raise ValueError("dataset_type must be one of thetao, so, or currents.")
     try:
         with xr.open_dataset(path) as dataset:
-            if "thetao" not in dataset:
-                raise ValueError("NetCDF must contain a 'thetao' variable.")
-
-            variable = dataset["thetao"]
+            required_variables = ("uo", "vo") if dataset_type == "currents" else (dataset_type,)
+            missing = [name for name in required_variables if name not in dataset]
+            if missing:
+                formatted = ", ".join(f"'{name}'" for name in missing)
+                raise ValueError(f"NetCDF must contain variable(s): {formatted}.")
+            variable = dataset[required_variables[0]]
             required_dimensions = ("time", "depth", "latitude", "longitude")
             if variable.dims != required_dimensions:
                 raise ValueError(
-                    "'thetao' dimensions must be ordered as "
+                    f"'{required_variables[0]}' dimensions must be ordered as "
                     "(time, depth, latitude, longitude)."
                 )
 
@@ -207,7 +236,8 @@ def validate_upload(path: Path) -> dict[str, Any]:
                 raise ValueError("Variable 'thetao' must contain at least one finite value.")
 
             return {
-                "variable": "thetao",
+                "variable": dataset_type,
+                "variables": list(required_variables),
                 "unit": variable.attrs.get("units", ""),
                 "times": dataset.sizes["time"],
                 "depths": dataset.sizes["depth"],
@@ -220,17 +250,15 @@ def validate_upload(path: Path) -> dict[str, Any]:
         raise ValueError("File is not a readable NetCDF dataset.") from error
 
 
-def promote_upload(path: Path) -> dict[str, Any]:
+def promote_upload(path: Path, dataset_type: str = "thetao") -> dict[str, Any]:
     """Validate and atomically install a temporary uploaded NetCDF file."""
-    metadata = validate_upload(path)
-    if get_upload_dataset.cache_info().currsize:
-        get_upload_dataset().close()
-        get_upload_dataset.cache_clear()
-    os.replace(path, UPLOAD_DATA_FILE)
+    metadata = validate_upload(path, dataset_type)
+    get_upload_dataset.cache_clear()
+    os.replace(path, upload_data_path(dataset_type))
     return metadata
 
 
-def save_upload_stream(file_object: Any) -> dict[str, Any]:
+def save_upload_stream(file_object: Any, dataset_type: str = "thetao") -> dict[str, Any]:
     """Persist a bounded stream, then validate and promote it."""
     UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
     total_bytes = 0
@@ -241,8 +269,8 @@ def save_upload_stream(file_object: Any) -> dict[str, Any]:
                 if total_bytes > MAX_UPLOAD_BYTES:
                     raise ValueError("NetCDF upload exceeds the 100 MiB limit.")
                 destination.write(chunk)
-        metadata = promote_upload(UPLOAD_TEMP_FILE)
-        return {**metadata, "size_bytes": total_bytes, "source": "upload"}
+        metadata = promote_upload(UPLOAD_TEMP_FILE, dataset_type)
+        return {**metadata, "dataset_type": dataset_type, "size_bytes": total_bytes, "source": "upload"}
     finally:
         UPLOAD_TEMP_FILE.unlink(missing_ok=True)
 

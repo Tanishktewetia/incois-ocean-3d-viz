@@ -1,23 +1,22 @@
+import { InfoButton } from "./ControlInfoModal.jsx";
+
 const VARIABLES = [
   ["thetao", "Temperature", "°C", "T"],
   ["so", "Salinity", "PSU", "S"],
   ["current_magnitude", "Currents", "m/s", "↗"],
 ];
 
-function Tip({ text }) {
-  return <span className="info-tip" title={text} aria-label={text}>i</span>;
-}
-
 function VisualizationControls({
   variable, onVariableChange, minimum, maximum, unit, onRangeChange,
   scale, onScaleChange, opacity, onOpacityChange, verticalExaggeration,
   onVerticalExaggerationChange, isosurfaceEnabled, onIsosurfaceEnabledChange,
   isosurfaceThreshold, onIsosurfaceThresholdChange, uploadSelected, error,
+  backgroundColor, onBackgroundColorChange, onInfoOpen,
 }) {
   return (
     <>
       <section className="control-section" aria-labelledby="variable-control-title">
-        <div className="control-kicker" id="variable-control-title">Variable <Tip text="Choose the model field rendered through the water column." /></div>
+        <div className="control-kicker" id="variable-control-title">Variable <InfoButton topic="variable" onOpen={onInfoOpen} /></div>
         <div className="variable-buttons">
           {VARIABLES.map(([value, label, variableUnit, icon]) => (
             <button className={`variable-button ${variable === value ? "active" : ""}`} type="button" key={value} disabled={uploadSelected && value !== "thetao"} onClick={() => onVariableChange(value)} title={`Render ${label.toLowerCase()} (${variableUnit})`} aria-pressed={variable === value}>
@@ -29,7 +28,7 @@ function VisualizationControls({
       </section>
 
       <section className="control-section" aria-labelledby="color-control-title">
-        <div className="control-kicker" id="color-control-title">Color range <Tip text="Set the real data values mapped from blue through red." /></div>
+        <div className="control-kicker" id="color-control-title">Color range <InfoButton topic="color" onOpen={onInfoOpen} /></div>
         <div className="colorbar" aria-label={`Colorbar from ${minimum} to ${maximum} ${unit}`} />
         <div className="range-fields">
           <label className="range-field">Minimum<div className="range-input-wrap"><input aria-label="Colorbar minimum" type="number" step="any" value={minimum} onChange={(event) => onRangeChange("minimum", event.target.value)} /><span>{unit}</span></div></label>
@@ -42,13 +41,14 @@ function VisualizationControls({
       </section>
 
       <section className="control-section" aria-labelledby="render-control-title">
-        <div className="control-kicker" id="render-control-title">Rendering <Tip text="Adjust layer visibility and vertical spacing without altering source values." /></div>
+        <div className="control-kicker" id="render-control-title">Rendering <InfoButton topic="rendering" onOpen={onInfoOpen} /></div>
         <label className="slider-control"><span className="slider-label">Layer opacity <output>{Math.round(opacity * 100)}%</output></span><input aria-label="Layer opacity" title="Set transparency of depth layers" type="range" min="0.05" max="1" step="0.05" value={opacity} onChange={(event) => onOpacityChange(Number(event.target.value))} /><span className="range-endpoints"><span>5%</span><span>100%</span></span></label>
         <label className="slider-control"><span className="slider-label">Vertical exaggeration <output>{verticalExaggeration.toFixed(1)}×</output></span><input aria-label="Vertical exaggeration" title="Stretch depth spacing for interpretation; values are unchanged" type="range" min="0.5" max="4" step="0.1" value={verticalExaggeration} onChange={(event) => onVerticalExaggerationChange(Number(event.target.value))} /><span className="range-endpoints"><span>0.5×</span><span>4×</span></span></label>
+        <div className="background-control"><span className="slider-label"><span>3D window background</span><output>{backgroundColor.toUpperCase()}</output></span><div className="background-picker-row"><input aria-label="3D window background color" type="color" value={backgroundColor} onChange={(event) => onBackgroundColorChange(event.target.value)} /><button type="button" onClick={() => onBackgroundColorChange("#102b40")}>Default blue</button></div></div>
       </section>
 
       <section className="control-section" aria-labelledby="surface-control-title">
-        <div className="control-kicker" id="surface-control-title">Volume analysis <Tip text="Extract a true data-derived surface at one threshold value." /></div>
+        <div className="control-kicker" id="surface-control-title">Volume analysis <InfoButton topic="volume" onOpen={onInfoOpen} /></div>
         <label className="toggle-row" title="Show a marching-cubes surface extracted from the loaded volume"><span>True isosurface</span><input aria-label="Show true isosurface" type="checkbox" checked={isosurfaceEnabled} onChange={(event) => onIsosurfaceEnabledChange(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label>
         <label className="slider-control"><span className="slider-label">Threshold <output>{isosurfaceThreshold.toFixed(2)} {unit}</output></span><input aria-label="Isosurface threshold" title="Choose the value represented by the extracted surface" type="range" min={minimum} max={maximum} step={(maximum - minimum) / 200} value={isosurfaceThreshold} disabled={!isosurfaceEnabled} onChange={(event) => onIsosurfaceThresholdChange(Number(event.target.value))} /></label>
         {error && <p className="control-error" role="alert">{error}</p>}

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { getOceanCurrents, getOceanLayers } from "../api/client.js";
+import { getCyclones, getOceanCurrents, getOceanLayers } from "../api/client.js";
 import InstrumentOverlay from "./InstrumentOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import VisualizationControls from "./VisualizationControls.jsx";
+import { ControlInfoModal, InfoButton } from "./ControlInfoModal.jsx";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
 import {
   createCurrentParticles,
@@ -33,11 +34,12 @@ function createOceanScene(
   verticalExaggeration,
   isosurfaceEnabled,
   isosurfaceThreshold,
+  backgroundColor,
   onInstrumentSelect,
   onInstrumentHover,
 ) {
   const scene = new THREE.Scene();
-  scene.background = null;
+  scene.background = new THREE.Color(backgroundColor);
   scene.add(new THREE.HemisphereLight(0xcceeff, 0x13202a, 2.1));
   const isosurfaceLight = new THREE.DirectionalLight(0xffffff, 2.2);
   isosurfaceLight.position.set(6, -8, 10);
@@ -86,6 +88,8 @@ function createOceanScene(
   isosurface.setThreshold(isosurfaceThreshold);
   isosurface.setVisible(isosurfaceEnabled);
   const instrumentMarkers = new THREE.Group();
+  const hazardMarkers = new THREE.Group();
+  scene.add(hazardMarkers);
   const markerGeometries = {
     core_argo: new THREE.SphereGeometry(0.1, 16, 12),
     bgc_argo: new THREE.OctahedronGeometry(0.14),
@@ -98,6 +102,8 @@ function createOceanScene(
     glider: new THREE.MeshBasicMaterial({ color: 0xd47cff }),
     ctd: new THREE.MeshBasicMaterial({ color: 0xd47cff }),
   };
+  const markerHitGeometry = new THREE.SphereGeometry(0.28, 8, 6);
+  const markerHitMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
   const selectedMarkerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -163,7 +169,7 @@ function createOceanScene(
     pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(instrumentMarkers.children, false)[0];
+    const hit = raycaster.intersectObjects(instrumentMarkers.children, true)[0];
     if (hit) {
       onInstrumentSelect(hit.object.userData.instrument.id);
     }
@@ -173,7 +179,8 @@ function createOceanScene(
     pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
-    const hit = raycaster.intersectObjects(instrumentMarkers.children, false)[0];
+    const hit = raycaster.intersectObjects(instrumentMarkers.children, true)[0];
+    renderer.domElement.style.cursor = hit ? "pointer" : "grab";
     onInstrumentHover(hit?.object.userData.instrument || null);
   }
   renderer.domElement.addEventListener("click", handlePointerClick);
@@ -201,6 +208,26 @@ function createOceanScene(
   animate();
 
   return {
+    setCyclones(events) {
+      hazardMarkers.clear();
+      events.forEach((event) => {
+        const points = event.coordinates.map(([longitude, latitude]) => new THREE.Vector3(
+          ((longitude - payload.longitudes[0]) / longitudeSpan - 0.5) * PLANE_WIDTH,
+          ((latitude - payload.latitudes[0]) / latitudeSpan - 0.5) * planeHeight,
+          STACK_HEIGHT / 2 + 0.28,
+        ));
+        const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0xf05a5a, linewidth: 2 }));
+        hazardMarkers.add(line);
+        const marker = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), new THREE.MeshBasicMaterial({ color: 0xf05a5a }));
+        marker.position.copy(points[points.length - 1]);
+        marker.userData.hazard = event;
+        hazardMarkers.add(marker);
+      });
+    },
+    setBackgroundColor(nextColor) {
+      scene.background = new THREE.Color(nextColor);
+      renderer.setClearColor(nextColor, 1);
+    },
     cameraAction(action) {
       const offset = camera.position.clone().sub(controls.target);
       if (action === "rotate") {
@@ -243,6 +270,9 @@ function createOceanScene(
         );
         marker.userData.instrument = instrument;
         marker.renderOrder = 100;
+        const hitArea = new THREE.Mesh(markerHitGeometry, markerHitMaterial);
+        hitArea.userData.instrument = instrument;
+        marker.add(hitArea);
         instrumentMarkers.add(marker);
       });
     },
@@ -303,6 +333,7 @@ function createOceanScene(
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("click", handlePointerClick);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
+      renderer.domElement.style.cursor = "";
       renderer.domElement.removeEventListener("pointerdown", preventMiddleMouseDefault);
       renderer.domElement.removeEventListener("mousedown", preventMiddleMouseDefault);
       renderer.domElement.removeEventListener("auxclick", preventMiddleMouseDefault);
@@ -310,6 +341,8 @@ function createOceanScene(
       controls.dispose();
       Object.values(markerGeometries).forEach((value) => value.dispose());
       Object.values(markerMaterials).forEach((value) => value.dispose());
+      markerHitGeometry.dispose();
+      markerHitMaterial.dispose();
       selectedMarkerMaterial.dispose();
       isosurface.dispose();
       currentParticles.dispose();
@@ -324,7 +357,7 @@ function createOceanScene(
   };
 }
 
-function OceanScene3D({ dataSource }) {
+function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0 }) {
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
   const sceneApiRef = useRef(null);
@@ -332,9 +365,10 @@ function OceanScene3D({ dataSource }) {
   const instrumentsRef = useRef([]);
   const [payload, setPayload] = useState(null);
   const [range, setRange] = useState(null);
-  const [variable, setVariable] = useState("thetao");
+  const [variable, setVariable] = useState(initialVariable);
   const [scale, setScale] = useState("linear");
   const [opacity, setOpacity] = useState(0.9);
+  const [backgroundColor, setBackgroundColor] = useState("#102b40");
   const [verticalExaggeration, setVerticalExaggeration] = useState(1);
   const [isosurfaceEnabled, setIsosurfaceEnabled] = useState(false);
   const [isosurfaceThreshold, setIsosurfaceThreshold] = useState(0);
@@ -351,6 +385,10 @@ function OceanScene3D({ dataSource }) {
   const [currentStatus, setCurrentStatus] = useState("off");
   const [fullscreenPanel, setFullscreenPanel] = useState(null);
   const [profileEnlarged, setProfileEnlarged] = useState(false);
+  const [infoTopic, setInfoTopic] = useState(null);
+  const [cycloneStatus, setCycloneStatus] = useState("off");
+
+  useEffect(() => { setVariable(initialVariable); }, [initialVariable]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -429,6 +467,7 @@ function OceanScene3D({ dataSource }) {
         verticalExaggeration,
         isosurfaceEnabled,
         isosurfaceThreshold,
+        backgroundColor,
         setSelectedInstrumentId,
         setHoveredInstrument,
       );
@@ -453,6 +492,10 @@ function OceanScene3D({ dataSource }) {
   }, [opacity]);
 
   useEffect(() => {
+    sceneApiRef.current?.setBackgroundColor(backgroundColor);
+  }, [backgroundColor]);
+
+  useEffect(() => {
     sceneApiRef.current?.setVerticalExaggeration(verticalExaggeration);
   }, [verticalExaggeration]);
 
@@ -467,6 +510,28 @@ function OceanScene3D({ dataSource }) {
   useEffect(() => {
     sceneApiRef.current?.selectInstrument(selectedInstrumentId);
   }, [selectedInstrumentId]);
+
+  useEffect(() => {
+    if (!payload) return undefined;
+    const controller = new AbortController();
+    setCycloneStatus("loading");
+    getCyclones({ signal: controller.signal }).then((result) => {
+      const margin = 5;
+      const minLon = payload.longitudes[0] - margin;
+      const maxLon = payload.longitudes.at(-1) + margin;
+      const minLat = payload.latitudes[0] - margin;
+      const maxLat = payload.latitudes.at(-1) + margin;
+      const events = result.events.flatMap((event) => {
+        const coordinates = event.coordinates.filter(([lon, lat]) => lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat);
+        return coordinates.length ? [{ ...event, coordinates }] : [];
+      });
+      sceneApiRef.current?.setCyclones(events);
+      setCycloneStatus(events.length ? `${events.length} active near extent` : "No active cyclone near extent");
+    }).catch((requestError) => {
+      if (requestError.name !== "AbortError") { sceneApiRef.current?.setCyclones([]); setCycloneStatus("GDACS unavailable"); }
+    });
+    return () => controller.abort();
+  }, [payload]);
 
   useEffect(() => {
     if (selectedTimeIndex === null || times.length === 0) {
@@ -591,13 +656,16 @@ function OceanScene3D({ dataSource }) {
   const unit = displayUnit(payload);
   return (
     <section className="ocean-workspace" aria-labelledby="ocean-scene-title">
-      <aside className="control-sidebar" aria-label="Visualization controls">
+      <aside className="control-sidebar" aria-label="Visualization controls" onClick={(event) => {
+        if (event.target.closest(".info-tip") && event.target.closest(".control-section")?.textContent.toLowerCase().includes("flow overlay")) {
+          setInfoTopic("currents");
+        }
+      }}>
         <div className="panel-header"><h2>Visual controls</h2><span className="step-label">01 · Configure</span></div>
-        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} uploadSelected={dataSource === "upload"} error={controlsError} />}
-        {payload && selectedTimeIndex !== null && <DepthTimeSlider depths={payload.layers.map((layer) => layer.depth)} selectedDepthIndex={selectedDepthIndex} onDepthChange={setSelectedDepthIndex} times={times} selectedTimeIndex={selectedTimeIndex} onTimeChange={handleTimeChange} isUpdating={isUpdating} />}
-        {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p></section>}
+        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} uploadSelected={dataSource === "upload"} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} />}
+        {payload && selectedTimeIndex !== null && <DepthTimeSlider depths={payload.layers.map((layer) => layer.depth)} selectedDepthIndex={selectedDepthIndex} onDepthChange={setSelectedDepthIndex} times={times} selectedTimeIndex={selectedTimeIndex} onTimeChange={handleTimeChange} isUpdating={isUpdating} onInfoOpen={setInfoTopic} />}
+        {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p><div className="hazard-row"><strong>Cyclone tracking</strong><span className="hazard-status">{cycloneStatus === "loading" ? "Checking GDACS…" : cycloneStatus}</span></div><small className="source-note">Source: GDACS public events API</small></section>}
       </aside>
-
       <article ref={scenePanelRef} className="scene-panel">
         <div className="scene-topbar"><div><h2 id="ocean-scene-title">3D ocean volume</h2><p>Copernicus model layers · instrument markers</p></div><div className="panel-actions"><div className="live-badge"><span />Interactive scene</div><button className="fullscreen-button" type="button" onClick={toggleSceneFullscreen} aria-label={fullscreenPanel === "scene" ? "Exit fullscreen 3D scene" : "View 3D scene fullscreen"} title={fullscreenPanel === "scene" ? "Exit fullscreen" : "View scene fullscreen"}><span aria-hidden="true">{fullscreenPanel === "scene" ? "↙" : "↗"}</span>{fullscreenPanel === "scene" ? "Collapse" : "Enlarge"}</button></div></div>
         <div className="scene-stage">
@@ -615,6 +683,7 @@ function OceanScene3D({ dataSource }) {
           <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("reset")} title="Reset the camera to the default view"><span aria-hidden="true">⌂</span>Reset</button>
         </div>
         {payload && range && <div className="scene-metadata"><span>Selected depth <strong>{payload.layers[selectedDepthIndex].depth.toFixed(0)} m</strong></span><span>Range <strong>{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} {unit}</strong></span><span>Scale <strong>{scale}</strong></span><span>Model date <strong>{payload.time.slice(0, 10)}</strong></span></div>}
+        <ControlInfoModal topic={infoTopic} onClose={() => setInfoTopic(null)} />
       </article>
 
       {profileEnlarged && <button className="profile-window-backdrop" type="button" aria-label="Close enlarged observation profile" onClick={() => setProfileEnlarged(false)} />}

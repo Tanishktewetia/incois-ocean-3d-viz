@@ -1,4 +1,7 @@
 from functools import lru_cache
+import csv
+import io
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -81,6 +84,84 @@ SAMPLE_INSTRUMENTS: tuple[dict[str, Any], ...] = (
         },
     },
 )
+
+_uploaded_instruments: dict[str, dict[str, Any]] = {}
+
+
+def parse_uploaded_instrument_csv(content: bytes, filename: str) -> dict[str, Any]:
+    try:
+        rows = list(csv.DictReader(io.StringIO(content.decode("utf-8-sig"))))
+    except (UnicodeDecodeError, csv.Error) as error:
+        raise ValueError("Instrument CSV must be UTF-8 and have a header row.") from error
+    required = {"latitude", "longitude", "depth", "time"}
+    if not rows or not required.issubset({key.strip().lower() for key in rows[0]}):
+        raise ValueError("Instrument CSV must contain latitude, longitude, depth, and time columns.")
+    headers = {key.strip().lower(): key for key in rows[0]}
+    value_columns = [key for key in headers if key not in required]
+    if not value_columns:
+        raise ValueError("Instrument CSV must contain at least one measured value column.")
+    measurements: dict[str, list[dict[str, float]]] = {key: [] for key in value_columns}
+    for row in rows:
+        try:
+            latitude = float(row[headers["latitude"]]); longitude = float(row[headers["longitude"]])
+            depth = float(row[headers["depth"]]); time = row[headers["time"]]
+        except (TypeError, ValueError, KeyError) as error:
+            raise ValueError("Instrument CSV coordinates and depth must be numeric.") from error
+        if not time:
+            raise ValueError("Instrument CSV time values cannot be empty.")
+        for key in value_columns:
+            raw = row.get(headers[key], "")
+            if raw not in (None, ""):
+                try:
+                    measurements[key].append({"depth": depth, "value": float(raw)})
+                except ValueError as error:
+                    raise ValueError(f"Measured column '{key}' must be numeric.") from error
+    series = [{"variable": key, "label": key, "unit": "", "measurements": values} for key, values in measurements.items() if values]
+    if not series:
+        raise ValueError("Instrument CSV must contain at least one finite measured value.")
+    instrument_id = f"uploaded:{filename}:{len(_uploaded_instruments) + 1}"
+    instrument = {
+        "id": instrument_id, "instrument_type": "uploaded", "instrument_label": "Uploaded instrument",
+        "data_status": "uploaded", "source": f"Uploaded by researcher ({filename})",
+        "platform_number": filename, "cycle_number": None,
+        "time": rows[0][headers["time"]], "latitude": float(rows[0][headers["latitude"]]),
+        "longitude": float(rows[0][headers["longitude"]]), "variables": [item["variable"] for item in series],
+        "profile": {"series": series},
+    }
+    _uploaded_instruments[instrument_id] = instrument
+    request_instrument_profile.cache_clear()
+    return {key: value for key, value in instrument.items() if key != "profile"}
+
+
+def parse_uploaded_instrument_netcdf(content: bytes, filename: str) -> dict[str, Any]:
+    aliases = {"latitude": ("latitude", "lat", "LATITUDE"), "longitude": ("longitude", "lon", "LONGITUDE"), "depth": ("depth", "DEPTH", "pres", "PRES"), "time": ("time", "TIME", "JULD")}
+    with tempfile.NamedTemporaryFile(suffix=".nc") as temporary:
+        temporary.write(content); temporary.flush()
+        try:
+            with xr.open_dataset(temporary.name) as dataset:
+                names = {key: next((name for name in options if name in dataset), None) for key, options in aliases.items()}
+                if any(value is None for value in names.values()):
+                    raise ValueError("Instrument NetCDF must contain latitude, longitude, depth, and time variables.")
+                coordinate_names = set(names.values())
+                length = max(dataset[name].size for name in names.values())
+                rows = []
+                value_names = [name for name in dataset.data_vars if name not in coordinate_names and dataset[name].size == length]
+                if not value_names:
+                    raise ValueError("Instrument NetCDF must contain at least one measured value variable.")
+                for index in range(length):
+                    row = {}
+                    for key, name in names.items():
+                        value = dataset[name].values.reshape(-1)[index if dataset[name].size > 1 else 0]
+                        row[key] = np.datetime_as_string(value, unit="s") if key == "time" and np.issubdtype(dataset[name].dtype, np.datetime64) else str(value)
+                    for name in value_names:
+                        row[name] = str(dataset[name].values.reshape(-1)[index])
+                    rows.append(row)
+        except (OSError, TypeError, ValueError) as error:
+            if isinstance(error, ValueError): raise
+            raise ValueError("Instrument upload is not a readable NetCDF dataset.") from error
+    fieldnames = list(rows[0])
+    output = io.StringIO(); writer = csv.DictWriter(output, fieldnames=fieldnames); writer.writeheader(); writer.writerows(rows)
+    return parse_uploaded_instrument_csv(output.getvalue().encode("utf-8"), filename)
 
 
 def _profile_variable(dataset: xr.Dataset, variable: str) -> tuple[int, str, str] | None:
@@ -209,7 +290,7 @@ def _public_metadata(instrument: dict[str, Any]) -> dict[str, Any]:
 
 
 def request_instruments() -> dict[str, Any]:
-    instruments = _core_catalog() + list(_bgc_catalog()) + [
+    instruments = list(_uploaded_instruments.values()) + _core_catalog() + list(_bgc_catalog()) + [
         _public_metadata(instrument) for instrument in SAMPLE_INSTRUMENTS
     ]
     return {
@@ -222,6 +303,8 @@ def request_instruments() -> dict[str, Any]:
 
 @lru_cache(maxsize=128)
 def request_instrument_profile(instrument_id: str) -> dict[str, Any]:
+    if instrument_id in _uploaded_instruments:
+        return _uploaded_instruments[instrument_id]
     if instrument_id.startswith("core-argo:"):
         profile = request_argo_profile(instrument_id.split(":", 1)[1])
         return {

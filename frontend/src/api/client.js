@@ -17,9 +17,10 @@ async function responseError(response, fallback) {
   }
 }
 
-export async function uploadOceanDataset(file, { signal } = {}) {
+export async function uploadOceanDataset(file, datasetType = "thetao", { signal } = {}) {
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("dataset_type", datasetType);
   const response = await fetch("/api/upload", {
     method: "POST",
     body: formData,
@@ -28,6 +29,20 @@ export async function uploadOceanDataset(file, { signal } = {}) {
   if (!response.ok) {
     throw await responseError(response, `Dataset upload failed with status ${response.status}`);
   }
+  return response.json();
+}
+
+export async function uploadInstrumentDataset(file, { signal } = {}) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const response = await fetch("/api/instruments/upload", { method: "POST", body: formData, signal });
+  if (!response.ok) throw await responseError(response, `Instrument upload failed with status ${response.status}`);
+  return response.json();
+}
+
+export async function getCyclones({ signal } = {}) {
+  const response = await fetch("/api/hazards/cyclones", { signal });
+  if (!response.ok) throw await responseError(response, "GDACS cyclone data is unavailable.");
   return response.json();
 }
 

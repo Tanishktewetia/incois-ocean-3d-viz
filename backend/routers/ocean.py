@@ -1,6 +1,6 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 
 from backend.services.slicer import (
     OceanDataUnavailableError,
@@ -14,14 +14,19 @@ router = APIRouter(prefix="/api", tags=["ocean"])
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)
-def upload_dataset(file: UploadFile = File(...)) -> dict[str, Any]:
+def upload_dataset(
+    file: UploadFile = File(...),
+    dataset_type: str = Form("thetao"),
+) -> dict[str, Any]:
+    if not isinstance(dataset_type, str):
+        dataset_type = "thetao"
     if not file.filename or not file.filename.lower().endswith(".nc"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Upload must be a NetCDF file with a .nc extension.",
         )
     try:
-        return {"filename": file.filename, **save_upload_stream(file.file)}
+        return {"filename": file.filename, **save_upload_stream(file.file, dataset_type)}
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

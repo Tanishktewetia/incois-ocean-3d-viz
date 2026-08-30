@@ -37,7 +37,8 @@ function AppHeader({ connectionStatus }) {
 function App() {
   const [connectionStatus, setConnectionStatus] = useState("Connecting to backend…");
   const [dataSource, setDataSource] = useState("demo");
-  const [upload, setUpload] = useState(null);
+  const [uploads, setUploads] = useState({});
+  const [activeVariable, setActiveVariable] = useState("thetao");
 
   useEffect(() => {
     getHealth()
@@ -82,17 +83,17 @@ function App() {
           <div className="data-lab-grid">
             <DatasetUpload
               dataSource={dataSource}
-              upload={upload}
+              uploads={uploads}
               onDataSourceChange={setDataSource}
-              onUpload={(metadata) => {
-                setUpload(metadata);
-                setDataSource("upload");
+              onUpload={(type, metadata) => {
+                setUploads((current) => ({ ...current, [type]: metadata }));
+                if (type !== "instruments") setActiveVariable(type === "currents" ? "current_magnitude" : type);
               }}
             />
-            <HeatmapCanvas dataSource={dataSource} />
+            <HeatmapCanvas dataSource={dataSource} variable={activeVariable} />
           </div>
         </section>
-        <OceanScene3D dataSource={dataSource} />
+        <OceanScene3D dataSource={dataSource} initialVariable={activeVariable} uploadedInstrumentCount={uploads.instruments ? 1 : 0} />
       </main>
       <footer><span>OceanScope · SIH PS 26067</span><span>Built on traceable ocean data, not invented terrain.</span></footer>
     </div>

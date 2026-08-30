@@ -358,6 +358,59 @@ data type and correlate results manually, which is exactly the
 above; if the agent adds any claim not covered by this research, it must
 flag it for the user to verify rather than publishing it.
 
+### Phase 15 — Multi-Dataset Upload & External Hazard Overlays
+
+**15a. Multi-dataset upload**
+Extend Phase 8's single temperature-only upload into independent upload
+slots for each data type, matching the PS's "ingest new observational
+data streams or additional model variables" requirement more fully:
+- Temperature (`thetao`), Salinity (`so`), Currents (`uo`/`vo`) — each
+  validated independently against the same `(time, depth, latitude,
+  longitude)` coordinate contract used today, but not required to share
+  the same grid/extent as each other (a scientist may only have some of
+  these).
+- An instrument/point-data upload (CSV or NetCDF) with columns/variables
+  for latitude, longitude, depth, time, and one or more measured
+  values, parsed into the same unified instrument schema as Phase 9.
+  Tag this data `data_status=uploaded` (distinct from `sample` and from
+  GDAC `real`) so its provenance is always honest and visible.
+- The active region shown in the 3D scene must derive from whichever
+  dataset(s) are currently active, never a hardcoded India EEZ box —
+  this already works for the existing temperature upload and must
+  continue to work as more upload types are added.
+- UI: extend Data Lab with independent, optional upload slots per data
+  type, each with its own validation status.
+
+**15b. External hazard/advisory overlays**
+- **Cyclone tracking (build now — verified):** Integrate the GDACS
+  public API (`https://www.gdacs.org/gdacsapi/api/Events/geteventlist/EVENTS4APP`,
+  no API key required, JSON/GeoJSON, event_type=TC for tropical
+  cyclones) to show any active cyclone whose position falls within or
+  near the India EEZ region as a marker/track on the 3D scene, directly
+  supporting the PS's "hazard assessment" line.
+  Source: https://www.gdacs.org/documents/2025/GDACS_MHEWS_guide.pdf
+- **PFZ (fishing zone) advisory (conditional — verify first):** INCOIS
+  publishes Potential Fishing Zone advisories via a WebGIS at
+  `https://incois.gov.in/geoportal/MFASPFZ/index.html`. No public JSON
+  API for this was confirmed during research. Before building anything
+  user-facing, the agent must check whether this service (or
+  `https://incois.gov.in/gisserver/PFZ/index.html`) exposes a reachable
+  REST/ArcGIS endpoint. If yes, integrate it with clear source
+  attribution. If no reachable public endpoint exists, do not fabricate
+  or approximate this data — skip the feature and note it in
+  PHASE_LOG.md as a verified gap for future work, not something built.
+
+**Manual test:**
+1. Upload each data type independently (or a subset) and confirm the
+   3D scene, colorbar, and region all update to match, without needing
+   every type present at once.
+2. Confirm any active real cyclone from GDACS appears correctly
+   positioned when relevant; confirm the app behaves gracefully (no
+   crash, clear "no active cyclone" state) when there is none.
+3. Confirm PFZ is either genuinely live-linked with a real source
+   citation, or absent with an honest note in PHASE_LOG.md — no
+   placeholder or fabricated fishing-zone shapes.
+
 ---
 
 ## 8. Demo Script for Judges (~5–6 minutes)

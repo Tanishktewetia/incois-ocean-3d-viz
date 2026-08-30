@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getOceanSlice } from "../api/client.js";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
+import { ControlInfoModal, InfoButton } from "./ControlInfoModal.jsx";
 
 function drawHeatmap(canvas, slice) {
   const width = slice.longitudes.length;
@@ -17,11 +18,12 @@ function drawHeatmap(canvas, slice) {
   return { minimum, maximum };
 }
 
-function HeatmapCanvas({ dataSource }) {
+function HeatmapCanvas({ dataSource, variable = "thetao" }) {
   const canvasRef = useRef(null);
   const [slice, setSlice] = useState(null);
   const [range, setRange] = useState(null);
   const [error, setError] = useState("");
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -30,7 +32,7 @@ function HeatmapCanvas({ dataSource }) {
     setError("");
     getOceanSlice({
       depth: 0,
-      variable: "thetao",
+      variable,
       source: dataSource,
       signal: controller.signal,
     })
@@ -42,7 +44,7 @@ function HeatmapCanvas({ dataSource }) {
       });
 
     return () => controller.abort();
-  }, [dataSource]);
+  }, [dataSource, variable]);
 
   useEffect(() => {
     if (slice && canvasRef.current) {
@@ -56,8 +58,7 @@ function HeatmapCanvas({ dataSource }) {
 
   return (
     <section className="data-card" aria-labelledby="heatmap-title">
-      <p className="eyebrow">2D source check</p>
-      <h3 id="heatmap-title">Surface temperature grid</h3>
+      <div className="data-card-heading"><div><p className="eyebrow">2D source check</p><h3 id="heatmap-title">Surface temperature grid</h3></div><InfoButton topic="heatmap" onOpen={() => setInfoOpen(true)} /></div>
       {!slice && <p>Loading {dataSource === "demo" ? "Copernicus Marine" : "uploaded"} data…</p>}
       <canvas
         ref={canvasRef}
@@ -75,6 +76,7 @@ function HeatmapCanvas({ dataSource }) {
           {" · "}{slice.source === "demo" ? "Copernicus Marine temperature data (India EEZ)" : "My upload"}
         </p>
       )}
+      <ControlInfoModal topic={infoOpen ? "heatmap" : null} onClose={() => setInfoOpen(false)} />
     </section>
   );
 }
