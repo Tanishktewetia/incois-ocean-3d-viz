@@ -1,20 +1,5 @@
 # Phase Log
 
-## Phase 20 Fixes — Profile route and dedicated page
-
-- **Status:** Complete.
-- **Profile 404 cause:** The frontend client already called `/api/temperature/profile`, matching the router path `/api/temperature/profile`; `main.py` already includes `ocean_router`. The 404 was caused by the running port-8000 backend being an older process whose OpenAPI did not contain the Phase 20 routes. The current backend registers both profile and transect routes; restarting the backend loads them.
-- **Dedicated page fix:** `/temperature-volume` now mounts the presentation-only 3D volume scene beneath its map, profile, transect, and section controls. It no longer renders the composite Explorer's sidebar, observation panel, or figure-switching workspace on that route.
-- **Manual verification:** Restart the backend from the current checkout, open `/temperature-volume`, click a map or 3D point, and confirm `/api/temperature/profile` returns HTTP 200 with a real depth/temperature column. Click two map points and confirm the transect updates. Confirm the page contains only the Phase 20 layout and does not show `Layered ocean volume`, `Observation profile`, or the composite Explorer controls underneath.
-
-## Phase 20 — Temperature Volume Explorer
-
-- **Status:** Complete.
-- **Dedicated route:** Added `/temperature-volume` with its own state, India EEZ minimap, real-data 3D temperature volume, point profile panel, transect cross-section panel, and slice-from-top control. The existing `/explorer` composite remains unchanged in its workflow.
-- **Backend:** Added `/api/temperature/profile` and `/api/temperature/transect`. Both select the existing Copernicus `thetao` field and reuse Phase 6's `bilinear_profile` helper; the transect samples a straight lat/lon path and returns the interpolated depth-by-distance matrix.
-- **Provenance:** Profile, transect, minimap, and volume values come from the existing Copernicus temperature dataset. No additional data source or fabricated values were added.
-- **Manual verification:** Start both servers, open `/temperature-volume`, click a 3D surface or minimap location and confirm the profile panel shows a temperature/depth curve with the selected coordinates. Click two minimap points and confirm the transect panel renders a spatially varying temperature/depth cross-section. Change Slice from top and confirm only real model levels are selectable and deeper layers are hidden; use existing vertical exaggeration and Isotherm contours controls together and confirm they continue to affect the 3D figure.
-- **Automated validation:** Frontend production build passes; Python files compile; `git diff --check` passes. The configured environments do not have `pytest` installed, so the backend test suite could not be run in this shell.
 
 ## Isotherm Contour Toggle
 

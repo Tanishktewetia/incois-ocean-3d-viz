@@ -36,7 +36,7 @@ function drawHeatmap(canvas, slice, landImage) {
   return { minimum, maximum };
 }
 
-function HeatmapCanvas({ dataSource, variable = "thetao", onMapClick }) {
+function HeatmapCanvas({ dataSource, variable = "thetao" }) {
   const canvasRef = useRef(null);
   const [slice, setSlice] = useState(null);
   const [range, setRange] = useState(null);
@@ -88,15 +88,6 @@ function HeatmapCanvas({ dataSource, variable = "thetao", onMapClick }) {
         role="img"
         aria-label="Sea surface temperature heatmap of the India EEZ bounding box"
         className={`heatmap-canvas ${slice ? "" : "hidden"}`}
-        onClick={(event) => {
-          if (!slice || !onMapClick) return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          const x = (event.clientX - bounds.left) / bounds.width;
-          const y = 1 - (event.clientY - bounds.top) / bounds.height;
-          const latIndex = Math.max(0, Math.min(slice.latitudes.length - 1, Math.round(y * (slice.latitudes.length - 1))));
-          const lonIndex = Math.max(0, Math.min(slice.longitudes.length - 1, Math.round(x * (slice.longitudes.length - 1))));
-          onMapClick({ latitude: slice.latitudes[latIndex], longitude: slice.longitudes[lonIndex] });
-        }}
       />
       {slice && range && (
         <p className="heatmap-meta">
