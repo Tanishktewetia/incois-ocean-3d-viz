@@ -5,6 +5,7 @@ import HeatmapCanvas from "./components/HeatmapCanvas.jsx";
 import OceanScene3D from "./components/OceanScene3D.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import ComparisonPage from "./pages/ComparisonPage.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
 
 function Brand() {
   return (
@@ -16,6 +17,8 @@ function Brand() {
 }
 
 function AppHeader({ connectionStatus }) {
+  const onLandingPage = window.location.pathname === "/";
+  const onExplorerPage = window.location.pathname === "/explorer";
   const onAboutPage = window.location.pathname === "/about";
   const onComparisonPage = window.location.pathname === "/comparison";
   const connected = connectionStatus === "Backend connected";
@@ -23,7 +26,8 @@ function AppHeader({ connectionStatus }) {
     <header className="app-header">
       <Brand />
       <nav aria-label="Primary navigation">
-        <a className={!onAboutPage && !onComparisonPage ? "active" : ""} href="/">Explorer</a>
+        <a className={onLandingPage ? "active" : ""} href="/">Home</a>
+        <a className={onExplorerPage ? "active" : ""} href="/explorer">Explorer</a>
         <a className={onAboutPage ? "active" : ""} href="/about">Mission & impact</a>
         <a className={onComparisonPage ? "active" : ""} href="/comparison">Comparison</a>
       </nav>
@@ -45,6 +49,16 @@ function App() {
       .then(() => setConnectionStatus("Backend connected"))
       .catch(() => setConnectionStatus("Backend unavailable"));
   }, []);
+
+  if (window.location.pathname === "/") {
+    return (
+      <div className="app-shell landing-shell">
+        <AppHeader connectionStatus={connectionStatus} />
+        <LandingPage />
+        <footer className="landing-footer"><span>OceanScope · SIH PS 26067</span><span>Science with depth. Decisions with context.</span></footer>
+      </div>
+    );
+  }
 
   if (window.location.pathname === "/about") {
     return (

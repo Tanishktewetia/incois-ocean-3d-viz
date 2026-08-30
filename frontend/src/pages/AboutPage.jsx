@@ -18,7 +18,7 @@ function AboutPage() {
           <h1>From fragmented files<br />to a <span>living ocean picture.</span></h1>
           <p className="about-problem">Ocean scientists should not need a chain of specialist tools to understand one water column.</p>
           <p className="about-lede">OceanScope unifies forecast volumes, observation profiles, validation, researcher uploads, and GIS delivery in a single browser workspace—without hiding where the data came from.</p>
-          <a className="primary-link" href="/">Open the 3D explorer <span aria-hidden="true">→</span></a>
+          <a className="primary-link" href="/explorer">Open the 3D explorer <span aria-hidden="true">→</span></a>
         </div>
         <div className="mission-orbit" aria-label="OceanScope workflow: model, observations, and standards converge into one decision view">
           <div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" />
@@ -65,7 +65,7 @@ function AboutPage() {
         <div className="section-heading"><div><p className="eyebrow">PS 26067 coverage</p><h2 id="coverage-title">The requirement is the product.</h2></div><p>Every core problem-statement capability is implemented and connected to the same data workflow.</p></div>
         <div className="coverage-grid">{COVERAGE.map(([title, text], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{title}</h3><p>{text}</p></div><b aria-label="Implemented">✓</b></article>)}</div>
       </section>
-      <section className="about-cta"><div><p className="eyebrow">Ready to explore?</p><h2>See the India EEZ as a connected system.</h2></div><a className="primary-link" href="/">Launch OceanScope <span aria-hidden="true">→</span></a></section>
+      <section className="about-cta"><div><p className="eyebrow">Ready to explore?</p><h2>See the India EEZ as a connected system.</h2></div><a className="primary-link" href="/explorer">Launch OceanScope <span aria-hidden="true">→</span></a></section>
     </main>
   );
 }

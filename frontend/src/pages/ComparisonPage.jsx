@@ -38,9 +38,9 @@ const COMPARISON_ROWS = [
 ];
 
 const OCEANSCOPE_FEATURES = [
-  ["Browser-native 3D", "Open the Explorer to rotate a Copernicus model volume and move through its real variables, depths, and times.", "/"],
-  ["Observation comparison", "Select the real Core Argo or BGC-Argo markers to inspect profiles beside the model and view the implemented temperature RMSE comparison.", "/"],
-  ["Researcher ingestion", "Use the Data Lab in the Explorer to upload a NetCDF dataset into the existing visualization workflow.", "/"],
+  ["Browser-native 3D", "Open the Explorer to rotate a Copernicus model volume and move through its real variables, depths, and times.", "/explorer"],
+  ["Observation comparison", "Select the real Core Argo or BGC-Argo markers to inspect profiles beside the model and view the implemented temperature RMSE comparison.", "/explorer"],
+  ["Researcher ingestion", "Use the Data Lab in the Explorer to upload a NetCDF dataset into the existing visualization workflow.", "/explorer"],
   ["OGC delivery", "Open the implemented WMS capabilities or WCS description routes exposed by this application.", "http://127.0.0.1:8000/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities"],
 ];
 
@@ -121,7 +121,7 @@ function ComparisonPage() {
             <div className="proof-browser-bar"><span /><span /><span /><strong>oceanscope / explorer</strong></div>
             <div className="proof-browser-content"><div className="proof-map"><i /><i /><i /><i /></div><div className="proof-side"><b>Model volume</b><span>Variable · depth · time</span><span>Observation markers</span><span>Profile + RMSE</span></div></div>
             <p>Reference view: the live Explorer combines the scene, controls, and observation profile in this app.</p>
-            <a className="primary-link" href="/">Open working Explorer <span aria-hidden="true">→</span></a>
+            <a className="primary-link" href="/explorer">Open working Explorer <span aria-hidden="true">→</span></a>
           </div>
           <div className="proof-checklist">
             <article><span>01</span><div><h3>Open the Explorer</h3><p>Verify the browser-native volume, variable controls, depth/time controls, and markers.</p></div></article>
@@ -131,7 +131,7 @@ function ComparisonPage() {
         </div>
       </section>
 
-      <section className="comparison-cta"><div><p className="eyebrow">Keep the evidence close</p><h2>Compare the sources. Then inspect the working view.</h2></div><div className="comparison-cta-actions"><a className="primary-link" href="/">Launch Explorer <span aria-hidden="true">→</span></a><a className="secondary-link" href="/about">Read Mission & impact</a></div></section>
+      <section className="comparison-cta"><div><p className="eyebrow">Keep the evidence close</p><h2>Compare the sources. Then inspect the working view.</h2></div><div className="comparison-cta-actions"><a className="primary-link" href="/explorer">Launch Explorer <span aria-hidden="true">→</span></a><a className="secondary-link" href="/about">Read Mission & impact</a></div></section>
     </main>
   );
 }
