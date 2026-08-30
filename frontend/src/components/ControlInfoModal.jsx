@@ -13,6 +13,18 @@ export const CONTROL_INFO = {
     how: "Choose Temperature, Salinity, or Currents. The scene, range labels, threshold unit, and profile context update to match the selected field.",
     detail: "Temperature is shown in degrees Celsius, salinity in PSU, and derived current magnitude in m/s. The color range is recalculated from the loaded field; changing the range only changes the visual mapping, not the source values.",
   },
+  figureVolume: {
+    title: "Layered ocean volume",
+    what: "The main 3D view places the loaded model field at its real available depths, so you can inspect how the variable changes through the water column. GEBCO bathymetry, observation markers, optional current particles, and the isosurface are additional traceable layers.",
+    how: "Drag the scene to rotate, use the mouse wheel to zoom, and use the depth slider to highlight a model layer. Use Volume layer focus when you need to isolate bathymetry, one depth, the isosurface, or instruments. Hover a visible data layer to read its value, depth, and coordinates.",
+    detail: "Colors represent the selected variable and the active color range shown in the legend. Temperature uses °C, salinity uses PSU, and current magnitude uses m/s. The vertical exaggeration changes displayed spacing only; it does not change measurements.",
+  },
+  figureRelief: {
+    title: "Field relief surface",
+    what: "This view turns the selected model depth into a continuous 3D relief surface. Surface height is derived from the loaded field value, while color uses the same scientific color mapping as the volume.",
+    how: "Select a depth, rotate or zoom the surface, and change the variable, date, color range, or scale to examine a different field. Hover the surface to read the underlying value and geographic position.",
+    detail: "This is a visualization transform of real model values, not terrain or invented bathymetry. Missing cells remain holes so the surface does not imply data where none was provided.",
+  },
   color: {
     title: "Color range",
     what: "Maps numeric data values to the blue-to-red color scale.",

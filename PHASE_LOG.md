@@ -1,5 +1,16 @@
 # Phase Log
 
+## Phase 19 - Real Satellite Imagery on Land
+
+- **Status:** Complete.
+- **Source and verification:** Verified the architecture-listed NASA GIBS WMS `GetMap` endpoint for the existing `68–90°E, 5–22°N` extent. It returned HTTP 200 with a JPEG image and required no API key. The selected layer is `MODIS_Terra_CorrectedReflectance_TrueColor`.
+- **Caching:** Added a shared frontend imagery loader with a module-level cached promise. The 2D heatmap and 3D scene reuse the same single regional image request instead of fetching on every render.
+- **Land-only compositing:** For null/land cells, GIBS RGB pixels are inserted into the existing heatmap/DataTexture. Finite ocean cells continue to use the existing temperature/salinity/current color mapping without modification. The existing depth highlighting, time controls, and figure controls remain unchanged.
+- **Attribution:** Added `NASA GIBS` attribution wherever the imagery appears, alongside the existing GEBCO attribution in the 3D view and the source metadata in the 2D view.
+- **Files changed:** `frontend/src/utils/gibsImagery.js`, `frontend/src/components/HeatmapCanvas.jsx`, `frontend/src/components/OceanScene3D.jsx`, `PHASE_LOG.md`.
+- **Manual verification:** Start the backend and frontend and open `/explorer`. Confirm land cells show recognizable satellite imagery in the 2D source check and on the 3D surface, while ocean colors and values remain unchanged. Change variable, color range, depth, date, opacity, and figure/view focus; confirm ocean rendering still follows the model data. Confirm the NASA GIBS attribution is visible.
+- **Automated validation:** Frontend production build and `git diff --check` pass.
+
 ## Phase 19 — Interactive real-data 3D figures
 
 - **Status:** Complete

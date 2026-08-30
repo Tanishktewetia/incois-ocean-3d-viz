@@ -12,6 +12,7 @@ import {
   CURRENT_PARTICLE_COUNT,
 } from "../utils/currentParticles.js";
 import { createIsosurface } from "../utils/isosurface.js";
+import { getGibsLandImage } from "../utils/gibsImagery.js";
 
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
@@ -23,7 +24,6 @@ const VARIABLE_LABELS = {
 const FIGURE_LABELS = {
   volume: "Layered ocean volume",
   relief: "Field relief surface",
-  section: "Vertical ocean section",
 };
 
 function displayUnit(payload) {
@@ -45,6 +45,7 @@ function createOceanScene(
   backgroundColor,
   onInstrumentSelect,
   onInstrumentHover,
+  onDataHover,
   presentation,
   reducedMotion,
 ) {
@@ -89,6 +90,7 @@ function createOceanScene(
   const textures = [];
   const materials = [];
   const planes = [];
+  let landImageData = null;
   const currentParticles = createCurrentParticles({
     planeWidth: PLANE_WIDTH,
     planeHeight,
@@ -122,13 +124,29 @@ function createOceanScene(
   const pointer = new THREE.Vector2();
   scene.add(instrumentMarkers);
 
+  function createLayerPixels(layer, nextRange, nextScale) {
+    const pixels = createColorBuffer(layer.values, nextRange.minimum, nextRange.maximum, { scale: nextScale });
+    if (!landImageData) return pixels;
+    const sourceHeight = layer.values.length;
+    const sourceWidth = layer.values[0]?.length || 0;
+    for (let row = 0; row < sourceHeight; row += 1) {
+      for (let column = 0; column < sourceWidth; column += 1) {
+        const pixelIndex = (row * sourceWidth + column) * 4;
+        if (pixels[pixelIndex + 3] !== 0) continue;
+        const imageColumn = Math.round((column / Math.max(1, sourceWidth - 1)) * (landImageData.width - 1));
+        const imageRow = Math.round((1 - row / Math.max(1, sourceHeight - 1)) * (landImageData.height - 1));
+        const imageIndex = (imageRow * landImageData.width + imageColumn) * 4;
+        pixels[pixelIndex] = landImageData.data[imageIndex];
+        pixels[pixelIndex + 1] = landImageData.data[imageIndex + 1];
+        pixels[pixelIndex + 2] = landImageData.data[imageIndex + 2];
+        pixels[pixelIndex + 3] = 255;
+      }
+    }
+    return pixels;
+  }
+
   payload.layers.forEach((layer) => {
-    const pixels = createColorBuffer(
-      layer.values,
-      range.minimum,
-      range.maximum,
-      { scale },
-    );
+    const pixels = createLayerPixels(layer, range, scale);
     const texture = new THREE.DataTexture(
       pixels,
       payload.longitudes.length,
@@ -165,7 +183,6 @@ function createOceanScene(
   scene.add(frame);
   let bathymetryMesh = null;
   let reliefMesh = null;
-  let sectionMesh = null;
   let sceneViewMode = "composite";
   let sceneFigureMode = "volume";
   let sceneIsosurfaceEnabled = isosurfaceEnabled;
@@ -228,43 +245,6 @@ function createOceanScene(
     applyViewMode();
   }
 
-  function rebuildSectionFigure() {
-    disposeFigureMesh(sectionMesh);
-    const row = Math.floor(scenePayload.latitudes.length / 2);
-    const columns = scenePayload.longitudes.length;
-    const vertices = [];
-    const colors = [];
-    const addVertex = (layerIndex, column) => {
-      const value = scenePayload.layers[layerIndex].values[row][column];
-      vertices.push(
-        (column / (columns - 1) - 0.5) * PLANE_WIDTH,
-        0,
-        STACK_HEIGHT / 2 - (scenePayload.layers[layerIndex].depth / maximumDepth) * STACK_HEIGHT * sceneVerticalExaggeration,
-      );
-      colors.push(...fieldColor(value));
-    };
-    for (let layerIndex = 0; layerIndex < scenePayload.layers.length - 1; layerIndex += 1) {
-      for (let column = 0; column < columns - 1; column += 1) {
-        const corners = [
-          scenePayload.layers[layerIndex].values[row][column],
-          scenePayload.layers[layerIndex].values[row][column + 1],
-          scenePayload.layers[layerIndex + 1].values[row][column],
-          scenePayload.layers[layerIndex + 1].values[row][column + 1],
-        ];
-        if (!corners.every(Number.isFinite)) continue;
-        addVertex(layerIndex, column); addVertex(layerIndex + 1, column); addVertex(layerIndex, column + 1);
-        addVertex(layerIndex, column + 1); addVertex(layerIndex + 1, column); addVertex(layerIndex + 1, column + 1);
-      }
-    }
-    const sectionGeometry = new THREE.BufferGeometry();
-    sectionGeometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
-    sectionGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-    sectionGeometry.computeVertexNormals();
-    sectionMesh = new THREE.Mesh(sectionGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.8, metalness: 0 }));
-    scene.add(sectionMesh);
-    applyViewMode();
-  }
-
   function positionDepthLayers(exaggeration) {
     sceneVerticalExaggeration = exaggeration;
     planes.forEach((plane, index) => {
@@ -274,7 +254,6 @@ function createOceanScene(
     frame.scale.z = exaggeration;
     frame.position.z = STACK_HEIGHT / 2 - (STACK_HEIGHT * exaggeration) / 2;
     isosurface.setVerticalExaggeration(exaggeration);
-    rebuildSectionFigure();
   }
   function applyViewMode() {
     const volumeVisible = sceneFigureMode === "volume";
@@ -288,7 +267,6 @@ function createOceanScene(
     currentParticles.points.visible = volumeVisible && sceneViewMode === "composite" && sceneParticlesEnabled;
     frame.visible = volumeVisible && sceneViewMode === "composite";
     if (reliefMesh) reliefMesh.visible = sceneFigureMode === "relief";
-    if (sectionMesh) sectionMesh.visible = sceneFigureMode === "section";
   }
   positionDepthLayers(verticalExaggeration);
   rebuildReliefFigure();
@@ -309,11 +287,41 @@ function createOceanScene(
     pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
     raycaster.setFromCamera(pointer, camera);
     const hit = raycaster.intersectObjects(instrumentMarkers.children, true)[0];
-    renderer.domElement.style.cursor = hit ? "pointer" : "grab";
+    const dataHit = !hit
+      ? raycaster.intersectObjects(planes, false).find((intersection) => intersection.object.visible && intersection.uv)
+      : null;
+    if (dataHit) {
+      const column = Math.max(0, Math.min(payload.longitudes.length - 1, Math.round(dataHit.uv.x * (payload.longitudes.length - 1))));
+      const row = Math.max(0, Math.min(payload.latitudes.length - 1, Math.round(dataHit.uv.y * (payload.latitudes.length - 1))));
+      const layerIndex = Math.max(0, planes.indexOf(dataHit.object));
+      const value = payload.layers[layerIndex]?.values[row]?.[column];
+      if (Number.isFinite(value)) {
+        const [red, green, blue] = interpolateColor(value, sceneRange.minimum, sceneRange.maximum, sceneScale);
+        onDataHover({
+          value,
+          depth: payload.layers[layerIndex].depth,
+          latitude: payload.latitudes[row],
+          longitude: payload.longitudes[column],
+          variable: payload.variable,
+          unit: displayUnit(payload),
+          color: `rgb(${red}, ${green}, ${blue})`,
+        });
+      } else {
+        onDataHover(null);
+      }
+    } else {
+      onDataHover(null);
+    }
+    renderer.domElement.style.cursor = hit ? "pointer" : dataHit ? "crosshair" : "grab";
     onInstrumentHover(hit?.object.userData.instrument || null);
+  }
+  function handlePointerLeave() {
+    onDataHover(null);
+    onInstrumentHover(null);
   }
   renderer.domElement.addEventListener("click", handlePointerClick);
   renderer.domElement.addEventListener("pointermove", handlePointerMove);
+  renderer.domElement.addEventListener("pointerleave", handlePointerLeave);
 
   function resize() {
     const width = Math.max(container.clientWidth, 320);
@@ -396,6 +404,22 @@ function createOceanScene(
       scene.background = new THREE.Color(nextColor);
       renderer.setClearColor(nextColor, 1);
     },
+    setLandImagery(image) {
+      const imageCanvas = document.createElement("canvas");
+      imageCanvas.width = image.naturalWidth || image.width;
+      imageCanvas.height = image.naturalHeight || image.height;
+      const imageContext = imageCanvas.getContext("2d");
+      imageContext.drawImage(image, 0, 0);
+      landImageData = {
+        width: imageCanvas.width,
+        height: imageCanvas.height,
+        data: imageContext.getImageData(0, 0, imageCanvas.width, imageCanvas.height).data,
+      };
+      scenePayload.layers.forEach((layer, index) => {
+        textures[index].image.data.set(createLayerPixels(layer, sceneRange, sceneScale));
+        textures[index].needsUpdate = true;
+      });
+    },
     cameraAction(action) {
       const offset = camera.position.clone().sub(controls.target);
       if (action === "rotate") {
@@ -459,18 +483,12 @@ function createOceanScene(
       sceneRange = nextRange;
       sceneScale = nextScale;
       nextPayload.layers.forEach((layer, index) => {
-        const pixels = createColorBuffer(
-          layer.values,
-          nextRange.minimum,
-          nextRange.maximum,
-          { scale: nextScale },
-        );
+        const pixels = createLayerPixels(layer, nextRange, nextScale);
         textures[index].image.data.set(pixels);
         textures[index].needsUpdate = true;
       });
       isosurface.updateVolume(nextPayload, nextRange);
       rebuildReliefFigure();
-      rebuildSectionFigure();
     },
     setOpacity(nextOpacity) {
       layerOpacity = nextOpacity;
@@ -519,6 +537,7 @@ function createOceanScene(
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("click", handlePointerClick);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
+      renderer.domElement.removeEventListener("pointerleave", handlePointerLeave);
       renderer.domElement.style.cursor = "";
       renderer.domElement.removeEventListener("pointerdown", preventMiddleMouseDefault);
       renderer.domElement.removeEventListener("mousedown", preventMiddleMouseDefault);
@@ -540,7 +559,6 @@ function createOceanScene(
       bathymetryMesh?.geometry.dispose();
       bathymetryMesh?.material.dispose();
       disposeFigureMesh(reliefMesh);
-      disposeFigureMesh(sectionMesh);
       renderer.dispose();
       renderer.domElement.remove();
     },
@@ -551,6 +569,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
   const sceneApiRef = useRef(null);
+  const landImageRef = useRef(null);
   const payloadRef = useRef(null);
   const instrumentsRef = useRef([]);
   const [payload, setPayload] = useState(null);
@@ -568,6 +587,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [selectedTimeIndex, setSelectedTimeIndex] = useState(null);
   const [selectedInstrumentId, setSelectedInstrumentId] = useState(null);
   const [hoveredInstrument, setHoveredInstrument] = useState(null);
+  const [hoveredData, setHoveredData] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
   const reducedMotion = presentation && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -582,6 +602,18 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [figureMode, setFigureMode] = useState("volume");
 
   useEffect(() => { setVariable(initialVariable); }, [initialVariable]);
+
+  useEffect(() => {
+    let active = true;
+    getGibsLandImage().then((image) => {
+      if (!active) return;
+      landImageRef.current = image;
+      sceneApiRef.current?.setLandImagery(image);
+    }).catch(() => {
+      // The scene remains valid with transparent land cells if imagery is unavailable.
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!payload) return undefined;
@@ -674,10 +706,12 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         backgroundColor,
         setSelectedInstrumentId,
         setHoveredInstrument,
+        setHoveredData,
         presentation,
         reducedMotion,
       );
       sceneApiRef.current.setInstruments(instrumentsRef.current);
+      if (landImageRef.current) sceneApiRef.current.setLandImagery(landImageRef.current);
       sceneApiRef.current.highlightDepth(selectedDepthIndex);
       sceneApiRef.current.setFigureMode(figureMode);
     } else {
@@ -876,7 +910,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         {!payload && !error && <div className="loading-overlay"><div className="loading-content"><span className="loading-spinner" /><strong>Loading live ocean layers</strong></div></div>}
         {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
         {payload && <div className="region-caption"><strong>Live model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
-        <div className="bathymetry-caption">Seafloor: GEBCO 2026 bathymetry</div>
+        <div className="bathymetry-caption">Land imagery: NASA GIBS · Seafloor: GEBCO 2026 bathymetry</div>
       </div>
     );
   }
@@ -893,15 +927,17 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p><div className="hazard-row"><strong>Cyclone tracking</strong><span className="hazard-status">{cycloneStatus === "loading" ? "Checking GDACS…" : cycloneStatus}</span></div><small className="source-note">Source: GDACS public events API</small></section>}
       </aside>
       <article ref={scenePanelRef} className="scene-panel">
-        <div className="scene-topbar"><div><h2 id="ocean-scene-title">{FIGURE_LABELS[figureMode]}</h2><p>{figureMode === "section" ? `Section at ${payload ? payload.latitudes[Math.floor(payload.latitudes.length / 2)].toFixed(2) : "—"}°N · all model depths` : figureMode === "relief" ? "Selected model depth · height follows field value" : "Copernicus model layers · instrument markers"}</p></div><div className="panel-actions"><div className="live-badge"><span />Interactive scene</div><button className="fullscreen-button" type="button" onClick={toggleSceneFullscreen} aria-label={fullscreenPanel === "scene" ? "Exit fullscreen 3D scene" : "View 3D scene fullscreen"} title={fullscreenPanel === "scene" ? "Exit fullscreen" : "View scene fullscreen"}><span aria-hidden="true">{fullscreenPanel === "scene" ? "↙" : "↗"}</span>{fullscreenPanel === "scene" ? "Collapse" : "Enlarge"}</button></div></div>
+        <div className="scene-topbar"><div><h2 id="ocean-scene-title">{FIGURE_LABELS[figureMode]}</h2><p>{figureMode === "relief" ? "Selected model depth · height follows field value" : "Copernicus model layers · instrument markers"}</p></div><div className="panel-actions"><div className="live-badge"><span />Interactive scene</div><button className="fullscreen-button" type="button" onClick={toggleSceneFullscreen} aria-label={fullscreenPanel === "scene" ? "Exit fullscreen 3D scene" : "View 3D scene fullscreen"} title={fullscreenPanel === "scene" ? "Exit fullscreen" : "View scene fullscreen"}><span aria-hidden="true">{fullscreenPanel === "scene" ? "↙" : "↗"}</span>{fullscreenPanel === "scene" ? "Collapse" : "Enlarge"}</button></div></div>
         <div className="scene-stage">
           <div ref={containerRef} className="scene-container" role="img" aria-label={`Interactive ${FIGURE_LABELS[figureMode].toLowerCase()} of real ${VARIABLE_LABELS[variable].toLowerCase()} model data`} />
           {(!payload || isUpdating) && !error && <div className="loading-overlay"><div className="loading-content"><div className="loading-ring" /><strong>{payload ? "Updating the water column" : "Building the ocean volume"}</strong><span>Reading real model layers…</span></div></div>}
           {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
           {payload && <div className="region-caption" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><strong>Model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
           <div className="guided-hint">{figureMode === "volume" ? "Click a marker to compare its observed profile with the model. " : ""}Left drag rotates; middle drag pans; scroll zooms.</div>
-          {figureMode === "volume" && <div className="bathymetry-caption">Seafloor: GEBCO 2026 bathymetry</div>}
+          {figureMode === "volume" && <div className="bathymetry-caption">Land imagery: NASA GIBS · Seafloor: GEBCO 2026 bathymetry</div>}
+          {hoveredData && <div role="status" className="scene-data-tooltip"><div className="scene-data-tooltip-title"><span className="value-swatch" style={{ background: hoveredData.color }} />{VARIABLE_LABELS[hoveredData.variable] || hoveredData.variable}</div><strong>{hoveredData.value.toFixed(3)} {hoveredData.unit}</strong><div>Depth {hoveredData.depth.toFixed(0)} m</div><div>{hoveredData.latitude.toFixed(2)}°N · {hoveredData.longitude.toFixed(2)}°E</div></div>}
           {hoveredInstrument && <div role="tooltip" className="scene-tooltip" style={{ borderColor: hoveredInstrument.data_status === "sample" ? "#d47cff" : undefined }}><strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>{hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}<div>{hoveredInstrument.variables.join(", ")}</div></div>}
+          {payload && range && <div className="scene-legend" aria-label={`Color legend for ${VARIABLE_LABELS[payload.variable] || payload.variable}`}><div className="scene-legend-heading"><strong>{VARIABLE_LABELS[payload.variable] || payload.variable}</strong><span>hover surface for value</span></div><div className="scene-legend-bar" /><div className="scene-legend-scale"><span>{range.minimum.toFixed(2)}</span><span>{((range.minimum + range.maximum) / 2).toFixed(2)}</span><span>{range.maximum.toFixed(2)} {unit}</span></div></div>}
         </div>
         <div className="scene-toolbar" aria-label="3D camera controls">
           <button className="camera-button" type="button" onClick={() => sceneApiRef.current?.cameraAction("rotate")} title="Rotate the camera around the data; left-mouse drag rotates freely"><span aria-hidden="true">↻</span>Rotate</button>

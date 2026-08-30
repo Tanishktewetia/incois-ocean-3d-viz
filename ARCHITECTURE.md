@@ -443,32 +443,72 @@ shallowing near the coast) instead of a flat plane, and that this holds
 up whether viewing the demo dataset or an uploaded dataset covering the
 same region.
 
-### Phase 17 — Layer Isolation / Focus View
-Currently every element (depth-stack planes, bathymetry, instrument
-markers, isosurface) renders simultaneously, which can make it hard to
-study one thing clearly — e.g. the bathymetry becomes visible through
-the temperature planes. This phase adds a way to view one layer cleanly
-without needing multiple separate 3D renderers (which would be
-redundant and heavier on performance); it isolates visibility within the
-existing single scene instead.
+### Phase 17 — Dedicated Scientific Figures (lazy-mounted, one active at a time)
+Reference visualizations each focus on one variable/concept with full
+richness. Rather than one busy composite scene, this phase introduces a
+"Figure Explorer" the user switches between — each figure fully
+interactive, but only one mounted and rendering at any time. This list
+supersedes any earlier, simpler version of this phase — if a smaller set
+of models was already built, extend/rename that work to match this list
+rather than rebuilding from scratch. Always read PHASE_LOG.md first to
+see what already exists before starting.
 
-- Add a "View" selector with options: **Composite** (today's default,
-  everything shown together), **Bathymetry only**, **Selected depth
-  layer only** (just the one highlighted plane, not the full 8-layer
-  stack), **Isosurface only**, **Instruments only**.
-- Selecting a mode hides/dims everything except the chosen layer(s) via
-  visibility toggles on the existing Three.js objects — no new scene,
-  camera, or renderer.
-- Camera position, rotation, zoom, and all controls remain exactly as
-  they were when switching modes — only visibility changes.
-- Composite mode must remain the default so nothing breaks for someone
-  who never touches this control.
+**Shared rules for every figure:**
+- Reuse existing `OceanScene3D` infrastructure, API client, slicer
+  services, color scale, instrument/current/bathymetry/isosurface
+  implementations — no new rendering engine, no fake REST endpoints, no
+  hardcoded values.
+- Switching figures must fully dispose the previous Three.js scene
+  (renderer, geometry, materials, textures, controls) before mounting
+  the next — only one WebGL context at a time.
+- If a figure's required data/endpoint doesn't exist yet, stop and
+  report exactly what's missing rather than fabricating it.
+- Build and verify one figure at a time; do not start the next until the
+  current one works with real data, passes build/tests, and is recorded
+  in PHASE_LOG.md.
 
-**Manual test:** switch to "Bathymetry only" and confirm the seafloor is
-now clearly visible with nothing else drawn over or through it; switch
-to "Selected depth layer only" and confirm just one clean plane shows;
-switch back to Composite and confirm everything reappears exactly as
-before.
+**Figures (build in this order):**
+1. **Temperature Volume** — full 3D water-column temperature, depth
+   clipping, vertical exaggeration, opacity, min/max range, linear/log
+   scale, time slider, real GEBCO seafloor beneath. (Reuses existing
+   data/rendering — low effort.)
+2. **Temperature Cross-Section (transect)** — a vertical curtain along a
+   user-picked line between two lat/lon points. **Requires a new backend
+   capability**: sampling/interpolating the model field along an
+   arbitrary line, not just at grid points. Reuse the bilinear
+   interpolation already built for Phase 6's Argo-vs-model comparison
+   rather than writing new interpolation logic.
+3. **Temperature + Salinity dual volume** — two independently-colored,
+   independently-controlled volumes sharing geography/depth/time; never
+   merge the two fields into one fake combined value.
+4. **Currents** — particles/vectors driven by real `uo`/`vo`, depth and
+   time selectable, magnitude legend in m/s. (Reuses Phase 7 particle
+   system.)
+5. **Isosurface** — the existing real marching-cubes isosurface as its
+   own dedicated figure with variable/threshold/time controls. (Reuses
+   Phase 11.)
+6. **Instruments + Model** — Core Argo, BGC-Argo, and labelled sample
+   Glider/CTD points over the model volume, with click-to-profile and
+   RMSE where available. Sample data must keep the "SAMPLE DATA — not
+   live" label exactly as elsewhere in the app. (Reuses Phase 5/6/9.)
+7. **Bathymetry + water column** — the real GEBCO seafloor with a
+   variable layer above it. (Reuses Phase 16.)
+8. **Time Evolution** — scrub/play through real model timestamps,
+   optionally comparing two dates side by side. **The two-date
+   side-by-side comparison view is new** — the existing single-date time
+   slider does not do this yet.
+
+**Manual test per figure:** confirms real data (not placeholders),
+correct interaction (orbit/pan/zoom + figure-specific controls), only
+one figure's scene mounted at a time, and no regression to previously
+completed figures.
+
+**Manual test:** switch between models and confirm each is a clean,
+focused, fully interactive 3D view of just that data; confirm only one
+model is active/rendering at a time (e.g. via browser performance/memory
+behavior, or simply that switching feels instant and doesn't stack up
+lag); confirm the dedicated volume models show visibly smoother depth
+transitions than the original 8-layer Explorer view.
 
 ### Phase 18 — Landing Page
 A focused front door for the site, not a second application. No new
@@ -508,6 +548,34 @@ duplicated 3D storytelling — reuse what already exists.
 reused scene (not a static or generated image) and stays performant;
 confirm both CTAs navigate correctly; confirm `/explorer` still works
 exactly as before; confirm reduced-motion disables the idle animation.
+
+### Phase 19 — Real Satellite Imagery on Land
+Matches the visual reference the team was shown, using real sourced
+imagery rather than invented terrain — consistent with the project's
+honesty rules.
+
+- Source: NASA GIBS (Global Imagery Browse Services), free public WMS,
+  no API key required:
+  `https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi`
+  (true-color Blue Marble/MODIS imagery). Fetch one `GetMap` image for
+  the app's existing 68–90°E, 5–22°N bounding box and cache it.
+  Source: https://nasa-gibs.github.io/gibs-api-docs/access-basics/ ,
+  https://svs.gsfc.nasa.gov/2915
+- Apply this image as a texture **only on land cells** of the ocean
+  surface plane (2D heatmap and 3D scene), so land reads as recognizable
+  satellite-photo coastline instead of empty space or a flat color.
+- Ocean cells must continue to show the real temperature/salinity/
+  current color data exactly as today — this phase does not change how
+  ocean values are visualized, only how land is textured.
+- Keep the existing highlighted-depth-layer mechanism (Phase 4/17)
+  unchanged — this is a surface-texture change only, not a new
+  interaction model.
+- Attribute NASA GIBS wherever the imagery appears in the UI, the same
+  way GEBCO is already credited for bathymetry.
+
+**Manual test:** confirm land now shows recognizable real coastline
+imagery instead of empty space, ocean data coloring is unchanged, and
+existing depth/time/layer controls still work exactly as before.
 
 ---
 

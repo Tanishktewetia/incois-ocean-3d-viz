@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { getOceanSlice } from "../api/client.js";
 import { createColorBuffer, getFiniteRange } from "../utils/colorScale.js";
+import { getGibsLandImage } from "../utils/gibsImagery.js";
 import { ControlInfoModal, InfoButton } from "./ControlInfoModal.jsx";
 
-function drawHeatmap(canvas, slice) {
+function drawHeatmap(canvas, slice, landImage) {
   const width = slice.longitudes.length;
   const height = slice.latitudes.length;
   const { minimum, maximum } = getFiniteRange([slice.values]);
@@ -12,7 +13,24 @@ function drawHeatmap(canvas, slice) {
   canvas.height = height;
   const context = canvas.getContext("2d");
   const image = context.createImageData(width, height);
-  image.data.set(createColorBuffer(slice.values, minimum, maximum, { flipRows: true }));
+  const oceanPixels = createColorBuffer(slice.values, minimum, maximum, { flipRows: true });
+  if (landImage) {
+    const imageCanvas = document.createElement("canvas");
+    imageCanvas.width = width;
+    imageCanvas.height = height;
+    const imageContext = imageCanvas.getContext("2d");
+    imageContext.drawImage(landImage, 0, 0, width, height);
+    const landPixels = imageContext.getImageData(0, 0, width, height).data;
+    for (let index = 0; index < oceanPixels.length; index += 4) {
+      if (oceanPixels[index + 3] === 0) {
+        oceanPixels[index] = landPixels[index];
+        oceanPixels[index + 1] = landPixels[index + 1];
+        oceanPixels[index + 2] = landPixels[index + 2];
+        oceanPixels[index + 3] = 255;
+      }
+    }
+  }
+  image.data.set(oceanPixels);
 
   context.putImageData(image, 0, 0);
   return { minimum, maximum };
@@ -24,6 +42,7 @@ function HeatmapCanvas({ dataSource, variable = "thetao" }) {
   const [range, setRange] = useState(null);
   const [error, setError] = useState("");
   const [infoOpen, setInfoOpen] = useState(false);
+  const [landImage, setLandImage] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,10 +66,14 @@ function HeatmapCanvas({ dataSource, variable = "thetao" }) {
   }, [dataSource, variable]);
 
   useEffect(() => {
+    getGibsLandImage().then(setLandImage).catch(() => setLandImage(null));
+  }, []);
+
+  useEffect(() => {
     if (slice && canvasRef.current) {
-      setRange(drawHeatmap(canvasRef.current, slice));
+      setRange(drawHeatmap(canvasRef.current, slice, landImage));
     }
-  }, [slice]);
+  }, [slice, landImage]);
 
   if (error) {
     return <section className="data-card"><p className="control-error" role="alert">{error}</p></section>;
@@ -74,6 +97,7 @@ function HeatmapCanvas({ dataSource, variable = "thetao" }) {
           {" · "}{range.minimum.toFixed(2)}–{range.maximum.toFixed(2)} °C
           {" · "}{slice.time.slice(0, 10)}
           {" · "}{slice.source === "demo" ? "Copernicus Marine temperature data (India EEZ)" : "My upload"}
+          {" · Land imagery: NASA GIBS"}
         </p>
       )}
       <ControlInfoModal topic={infoOpen ? "heatmap" : null} onClose={() => setInfoOpen(false)} />

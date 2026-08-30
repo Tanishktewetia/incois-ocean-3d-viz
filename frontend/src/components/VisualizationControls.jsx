@@ -9,7 +9,6 @@ const VIEW_MODES = [["composite", "Composite"], ["bathymetry", "Bathymetry only"
 const FIGURE_MODES = [
   ["volume", "Layered ocean volume", "Depth layers, seafloor, observations, and optional flows"],
   ["relief", "Field relief surface", "Selected depth shown as an interactive value-height surface"],
-  ["section", "Vertical section", "Center-latitude longitude–depth section through every layer"],
 ];
 
 function VisualizationControls({
@@ -38,9 +37,12 @@ function VisualizationControls({
         <div className="control-kicker" id="view-control-title">3D figure</div>
         <div className="figure-buttons" role="group" aria-label="3D figure selection">
           {FIGURE_MODES.map(([value, label, description], index) => (
-            <button className={`figure-button ${figureMode === value ? "active" : ""}`} type="button" key={value} onClick={() => onFigureModeChange(value)} aria-pressed={figureMode === value}>
-              <span aria-hidden="true">0{index + 1}</span><strong>{label}</strong><small>{description}</small>
-            </button>
+            <div className="figure-button-row" key={value}>
+              <button className={`figure-button ${figureMode === value ? "active" : ""}`} type="button" onClick={() => onFigureModeChange(value)} aria-pressed={figureMode === value}>
+                <span aria-hidden="true">0{index + 1}</span><strong>{label}</strong><small>{description}</small>
+              </button>
+              <InfoButton topic={value === "volume" ? "figureVolume" : "figureRelief"} onOpen={onInfoOpen} />
+            </div>
           ))}
         </div>
         <label className="view-select-label" htmlFor="layer-view-mode">Volume layer focus</label>
