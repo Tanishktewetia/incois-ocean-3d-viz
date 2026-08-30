@@ -275,6 +275,16 @@ body { background: radial-gradient(circle at 72% 0%, rgba(43,174,191,.11), trans
 .variable-icon { background: #dff2f5; color: #08788b; }
 .variable-button small, .range-field, .range-input-wrap span, .range-endpoints { color: #687f90; }
 .range-input-wrap { background: #fff; }
+.control-sidebar .range-input-wrap { min-height: 38px; border-color: #c7dbe2; background: #f8fbfc; box-shadow: inset 0 1px 2px rgba(15, 63, 83, .04); }
+.control-sidebar .range-input-wrap input { appearance: textfield; padding: 8px 4px 8px 9px; color: #123650; font-size: .78rem; font-variant-numeric: tabular-nums; }
+.control-sidebar .range-input-wrap input::-webkit-inner-spin-button,
+.control-sidebar .range-input-wrap input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+.control-sidebar .range-input-wrap span { padding-right: 8px; color: #587487; font-size: .62rem; white-space: nowrap; }
+.control-sidebar .range-field { color: #587487; font-size: .64rem; font-weight: 700; letter-spacing: .07em; }
+.control-sidebar .colorbar { height: 12px; border-color: #b8d1da; box-shadow: 0 2px 5px rgba(20, 86, 108, .12); }
+.control-sidebar .segmented { margin-top: 10px; padding: 3px; border: 1px solid #d5e3e8; background: #edf4f7; }
+.control-sidebar .segmented button { min-height: 30px; color: #5a7484; font-weight: 600; }
+.control-sidebar .segmented button.active { color: #fff; background: #07899d; }
 .segmented { background: #eaf1f5; }
 .segmented button { color: #577083; }
 .segmented button.active { color: #fff; background: var(--cyan); box-shadow: 0 2px 8px rgba(7,137,157,.2); }
@@ -511,3 +521,4 @@ footer { color: #657d8e; background: #fff; }
 .hazard-status { color: #5c7890; font-size: 12px; }
 .source-note { display: block; color: #7890a0; margin-top: 5px; }
 @media (max-width: 800px) { .upload-slots { grid-template-columns: 1fr; } }
+.bathymetry-caption { position: absolute; right: 14px; bottom: 12px; padding: 5px 8px; border: 1px solid rgba(180, 220, 230, .35); border-radius: 5px; background: rgba(4, 22, 33, .78); color: #d5edf1; font-size: 10px; letter-spacing: .04em; }

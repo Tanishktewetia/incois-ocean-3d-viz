@@ -9,8 +9,17 @@ from backend.services.slicer import (
     request_slice,
     save_upload_stream,
 )
+from backend.services.bathymetry import get_bathymetry
 
 router = APIRouter(prefix="/api", tags=["ocean"])
+
+
+@router.get("/bathymetry")
+def bathymetry() -> dict[str, Any]:
+    try:
+        return get_bathymetry()
+    except RuntimeError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
 
 
 @router.post("/upload", status_code=status.HTTP_201_CREATED)

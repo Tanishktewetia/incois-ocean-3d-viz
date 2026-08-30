@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { getCyclones, getOceanCurrents, getOceanLayers } from "../api/client.js";
+import { getBathymetry, getCyclones, getOceanCurrents, getOceanLayers } from "../api/client.js";
 import InstrumentOverlay from "./InstrumentOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import VisualizationControls from "./VisualizationControls.jsx";
@@ -22,7 +22,10 @@ const VARIABLE_LABELS = {
 };
 
 function displayUnit(payload) {
-  return payload?.variable === "so" ? "PSU" : payload?.unit || "";
+  if (payload?.variable === "so") return "PSU";
+  if (payload?.variable === "current_magnitude") return "m/s";
+  if (payload?.variable === "thetao") return "°C";
+  return payload?.unit || "";
 }
 
 function createOceanScene(
@@ -150,6 +153,7 @@ function createOceanScene(
     new THREE.LineBasicMaterial({ color: 0x7da6bd, transparent: true, opacity: 0.45 }),
   );
   scene.add(frame);
+  let bathymetryMesh = null;
   let selectedDepthIndex = 0;
   let layerOpacity = opacity;
 
@@ -208,6 +212,28 @@ function createOceanScene(
   animate();
 
   return {
+    setBathymetry(bathymetry) {
+      if (bathymetryMesh) {
+        scene.remove(bathymetryMesh);
+        bathymetryMesh.geometry.dispose();
+        bathymetryMesh.material.dispose();
+      }
+      const rows = bathymetry.latitudes.length;
+      const columns = bathymetry.longitudes.length;
+      const meshGeometry = new THREE.PlaneGeometry(PLANE_WIDTH, planeHeight, columns - 1, rows - 1);
+      const positions = meshGeometry.attributes.position;
+      const elevationSpan = Math.max(1, bathymetry.maximum - bathymetry.minimum);
+      bathymetry.elevations.forEach((row, latIndex) => row.forEach((value, lonIndex) => {
+        const vertexIndex = latIndex * columns + lonIndex;
+        const normalized = value == null ? 0 : (value - bathymetry.minimum) / elevationSpan;
+        positions.setZ(vertexIndex, -STACK_HEIGHT / 2 - (1 - normalized) * 1.25);
+      }));
+      positions.needsUpdate = true;
+      meshGeometry.computeVertexNormals();
+      bathymetryMesh = new THREE.Mesh(meshGeometry, new THREE.MeshStandardMaterial({ color: 0x315b6a, roughness: 0.88, metalness: 0.02, side: THREE.DoubleSide }));
+      bathymetryMesh.renderOrder = -10;
+      scene.add(bathymetryMesh);
+    },
     setCyclones(events) {
       hazardMarkers.clear();
       events.forEach((event) => {
@@ -351,6 +377,8 @@ function createOceanScene(
       geometry.dispose();
       frame.geometry.dispose();
       frame.material.dispose();
+      bathymetryMesh?.geometry.dispose();
+      bathymetryMesh?.material.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },
@@ -389,6 +417,17 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [cycloneStatus, setCycloneStatus] = useState("off");
 
   useEffect(() => { setVariable(initialVariable); }, [initialVariable]);
+
+  useEffect(() => {
+    if (!payload) return undefined;
+    const controller = new AbortController();
+    getBathymetry({ signal: controller.signal }).then((data) => {
+      sceneApiRef.current?.setBathymetry(data);
+    }).catch(() => {
+      // The scene remains usable without the optional cached relief mesh.
+    });
+    return () => controller.abort();
+  }, [payload]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -674,6 +713,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
           {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
           {payload && <div className="region-caption" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><strong>Model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
           <div className="guided-hint">Click a marker to compare its observed profile with the model. Left drag rotates; middle drag pans; scroll zooms.</div>
+          <div className="bathymetry-caption">Seafloor: GEBCO 2026 bathymetry</div>
           {hoveredInstrument && <div role="tooltip" className="scene-tooltip" style={{ borderColor: hoveredInstrument.data_status === "sample" ? "#d47cff" : undefined }}><strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>{hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}<div>{hoveredInstrument.variables.join(", ")}</div></div>}
         </div>
         <div className="scene-toolbar" aria-label="3D camera controls">

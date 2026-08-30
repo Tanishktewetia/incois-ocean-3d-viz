@@ -8,6 +8,12 @@ export async function getHealth() {
   return response.json();
 }
 
+export async function getBathymetry({ signal } = {}) {
+  const response = await fetch("/api/bathymetry", { signal });
+  if (!response.ok) throw new Error("GEBCO bathymetry is unavailable.");
+  return response.json();
+}
+
 async function responseError(response, fallback) {
   try {
     const payload = await response.json();

@@ -411,6 +411,38 @@ data streams or additional model variables" requirement more fully:
    citation, or absent with an honest note in PHASE_LOG.md — no
    placeholder or fabricated fishing-zone shapes.
 
+### Phase 16 — Real Seafloor Bathymetry
+The 3D scene's floor is currently a flat plane, which reads as a blocky
+placeholder next to reference visualizations that show real seafloor
+relief. This phase adds that relief using real, measured, public data —
+it does not conflict with the earlier ban on fabricated terrain, because
+GEBCO bathymetry is actual sounding/satellite-derived seafloor
+measurement, not invented geometry.
+
+- Source: GEBCO gridded bathymetry
+  (https://www.gebco.net/data-products/gridded-bathymetry-data), public
+  domain, NetCDF, subsettable via their download app or OPeNDAP for the
+  existing 68–90°E, 5–22°N India EEZ box.
+- Download and cache one subset covering the app's fixed region (a
+  regional subset is a few MB, not the multi-GB global grid).
+- Render it as the base/floor mesh of the existing 3D volume — displace
+  a plane's vertices by the real depth values (downsampled to a
+  reasonable mesh resolution for performance), replacing today's flat
+  bottom, styled consistently with the rest of the scene (not
+  photorealistic terrain shading).
+- This must not replace or alter the temperature/salinity/current
+  layers, isosurface, particles, or instrument markers — it is purely
+  the seafloor beneath them.
+- Cite GEBCO exactly as their attribution requires (see architecture
+  citation in this section) wherever the bathymetry layer is mentioned
+  in the UI (e.g. a small "Seafloor: GEBCO bathymetry" caption).
+
+**Manual test:** rotate the scene and confirm the floor now shows real
+terrain relief (e.g. deeper trench-like areas, continental shelf
+shallowing near the coast) instead of a flat plane, and that this holds
+up whether viewing the demo dataset or an uploaded dataset covering the
+same region.
+
 ---
 
 ## 8. Demo Script for Judges (~5–6 minutes)
