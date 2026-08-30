@@ -220,17 +220,33 @@ function createOceanScene(
       }
       const rows = bathymetry.latitudes.length;
       const columns = bathymetry.longitudes.length;
-      const meshGeometry = new THREE.PlaneGeometry(PLANE_WIDTH, planeHeight, columns - 1, rows - 1);
+      const sourceStride = 4;
+      const meshRows = Math.ceil((rows - 1) / sourceStride) + 1;
+      const meshColumns = Math.ceil((columns - 1) / sourceStride) + 1;
+      const meshGeometry = new THREE.PlaneGeometry(PLANE_WIDTH, planeHeight, meshColumns - 1, meshRows - 1);
       const positions = meshGeometry.attributes.position;
-      const elevationSpan = Math.max(1, bathymetry.maximum - bathymetry.minimum);
-      bathymetry.elevations.forEach((row, latIndex) => row.forEach((value, lonIndex) => {
-        const vertexIndex = latIndex * columns + lonIndex;
-        const normalized = value == null ? 0 : (value - bathymetry.minimum) / elevationSpan;
-        positions.setZ(vertexIndex, -STACK_HEIGHT / 2 - (1 - normalized) * 1.25);
-      }));
+      const maximumOceanDepth = Math.max(1, Math.abs(Math.min(0, bathymetry.minimum)));
+      const smoothRadius = 2;
+      for (let latIndex = 0; latIndex < meshRows; latIndex += 1) {
+        for (let lonIndex = 0; lonIndex < meshColumns; lonIndex += 1) {
+          const sourceLat = Math.min(rows - 1, latIndex * sourceStride);
+          const sourceLon = Math.min(columns - 1, lonIndex * sourceStride);
+          let totalDepth = 0;
+          let samples = 0;
+          for (let latOffset = -smoothRadius; latOffset <= smoothRadius; latOffset += 1) {
+            for (let lonOffset = -smoothRadius; lonOffset <= smoothRadius; lonOffset += 1) {
+              const row = bathymetry.elevations[Math.max(0, Math.min(rows - 1, sourceLat + latOffset))];
+              const value = row?.[Math.max(0, Math.min(columns - 1, sourceLon + lonOffset))];
+              if (value != null && Number.isFinite(value)) { totalDepth += Math.max(0, -value); samples += 1; }
+            }
+          }
+          const depth = samples ? totalDepth / samples : 0;
+          positions.setZ(latIndex * meshColumns + lonIndex, -STACK_HEIGHT / 2 - 0.14 - (depth / maximumOceanDepth) * 1.65);
+        }
+      }
       positions.needsUpdate = true;
       meshGeometry.computeVertexNormals();
-      bathymetryMesh = new THREE.Mesh(meshGeometry, new THREE.MeshStandardMaterial({ color: 0x315b6a, roughness: 0.88, metalness: 0.02, side: THREE.DoubleSide }));
+      bathymetryMesh = new THREE.Mesh(meshGeometry, new THREE.MeshStandardMaterial({ color: 0x47798a, roughness: 0.9, metalness: 0, flatShading: false, side: THREE.DoubleSide }));
       bathymetryMesh.renderOrder = -10;
       scene.add(bathymetryMesh);
     },

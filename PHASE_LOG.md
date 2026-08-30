@@ -458,6 +458,15 @@
   5. Resize below 800 px and 520 px and confirm the hero, feature cards, proof panel, table, and CTA remain readable without breaking the page layout.
 - **Automated validation:** Frontend production build passes. `git diff --check` passes. Vite reports only the existing non-fatal large-chunk advisory.
 
+## Focused Fix - Bathymetry Mesh Rendering and Upload Clarity
+
+- **Status:** Complete.
+- **Bathymetry rendering fix:** Kept the GEBCO source/cache and API unchanged. The floor now uses a moderate mesh sampled from the cached regional grid, with a small local elevation average per vertex to remove high-frequency jaggedness. Positive land elevations are treated as zero ocean depth for floor placement, bathymetry is offset below the volume bottom to avoid wireframe z-fighting, depth relief is scaled from the real GEBCO minimum, and smooth vertex normals are explicitly retained for continuous lighting.
+- **Upload clarity fix:** Added a clear Data Lab explanation that any subset may be uploaded independently and missing fields continue to use bundled Copernicus data. Each slot now states its optional status, format, and exact required variables/dimensions.
+- **Files changed:** `frontend/src/components/OceanScene3D.jsx`, `frontend/src/components/DatasetUpload.jsx`, `frontend/src/styles.css`, `PHASE_LOG.md`.
+- **Manual verification:** Restart the app, rotate and zoom the 3D scene, and confirm GEBCO relief is continuous, smooth-lit, and free of dark fragmented patches or bottom-edge flicker. Confirm existing volume layers, markers, particles, isosurface, and controls remain unchanged. In Data Lab, verify the intro explains partial uploads and each Temperature, Salinity, Currents, and Instrument slot visibly lists Optional, accepted format, and required fields.
+- **Automated validation:** Frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
+
 ## Phase 15 - Multi-Dataset Upload and External Hazard Overlays
 
 - **Status:** Complete for 15a and GDACS 15b; PFZ intentionally skipped after endpoint verification.

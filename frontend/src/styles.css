@@ -511,6 +511,7 @@ footer { color: #657d8e; background: #fff; }
 .upload-slot { border: 1px solid #d7e4e9; border-radius: 10px; padding: 11px; background: #f8fbfc; }
 .upload-slot-heading, .upload-slot-row, .hazard-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .upload-slot-heading small { display: block; color: #5c7890; font-size: 11px; margin-top: 3px; }
+.upload-slot-help { margin: 8px 0 0; color: #536f80; font-size: 11px; line-height: 1.35; }
 .slot-status { color: #71899a; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 .slot-status.ready { color: #008b87; font-weight: 700; }
 .upload-slot-row { margin-top: 9px; }
