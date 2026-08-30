@@ -1,5 +1,12 @@
 # Phase Log
 
+## Phase 20 Fixes — Profile route and dedicated page
+
+- **Status:** Complete.
+- **Profile 404 cause:** The frontend client already called `/api/temperature/profile`, matching the router path `/api/temperature/profile`; `main.py` already includes `ocean_router`. The 404 was caused by the running port-8000 backend being an older process whose OpenAPI did not contain the Phase 20 routes. The current backend registers both profile and transect routes; restarting the backend loads them.
+- **Dedicated page fix:** `/temperature-volume` now mounts the presentation-only 3D volume scene beneath its map, profile, transect, and section controls. It no longer renders the composite Explorer's sidebar, observation panel, or figure-switching workspace on that route.
+- **Manual verification:** Restart the backend from the current checkout, open `/temperature-volume`, click a map or 3D point, and confirm `/api/temperature/profile` returns HTTP 200 with a real depth/temperature column. Click two map points and confirm the transect updates. Confirm the page contains only the Phase 20 layout and does not show `Layered ocean volume`, `Observation profile`, or the composite Explorer controls underneath.
+
 ## Phase 20 — Temperature Volume Explorer
 
 - **Status:** Complete.

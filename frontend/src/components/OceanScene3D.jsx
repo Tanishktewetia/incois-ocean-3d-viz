@@ -678,7 +678,7 @@ function createOceanScene(
   };
 }
 
-function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false, onDataSelect, sliceDepth = null }) {
+function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false, onDataSelect, sliceDepth = null, dedicatedVerticalExaggeration, dedicatedIsothermContours }) {
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
   const sceneApiRef = useRef(null);
@@ -859,6 +859,10 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   }, [verticalExaggeration]);
 
   useEffect(() => {
+    if (dedicatedVerticalExaggeration !== undefined) setVerticalExaggeration(dedicatedVerticalExaggeration);
+  }, [dedicatedVerticalExaggeration]);
+
+  useEffect(() => {
     sceneApiRef.current?.setIsosurfaceVisible(isosurfaceEnabled);
   }, [isosurfaceEnabled]);
 
@@ -877,6 +881,13 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   useEffect(() => {
     sceneApiRef.current?.setIsothermContoursVisible(isothermContoursEnabled);
   }, [isothermContoursEnabled]);
+
+  useEffect(() => {
+    if (dedicatedIsothermContours !== undefined) {
+      setIsothermContoursEnabled(dedicatedIsothermContours);
+      sceneApiRef.current?.setIsothermContoursVisible(dedicatedIsothermContours);
+    }
+  }, [dedicatedIsothermContours]);
 
   useEffect(() => {
     sceneApiRef.current?.setSliceDepth(sliceDepth);
