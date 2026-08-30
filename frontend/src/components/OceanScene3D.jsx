@@ -13,6 +13,7 @@ import {
 } from "../utils/currentParticles.js";
 import { createIsosurface } from "../utils/isosurface.js";
 import { getGibsLandImage } from "../utils/gibsImagery.js";
+import { createTemperatureSolid } from "../utils/temperatureSolid.js";
 
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
@@ -24,6 +25,7 @@ const VARIABLE_LABELS = {
 const FIGURE_LABELS = {
   volume: "Layered ocean volume",
   relief: "Field relief surface",
+  solid: "Temperature solid volume",
 };
 
 function displayUnit(payload) {
@@ -103,6 +105,8 @@ function createOceanScene(
   scene.add(isosurface.mesh);
   isosurface.setThreshold(isosurfaceThreshold);
   isosurface.setVisible(isosurfaceEnabled);
+  const solidVolume = createTemperatureSolid(payload, range, PLANE_WIDTH, planeHeight, STACK_HEIGHT);
+  scene.add(solidVolume.group);
   const instrumentMarkers = new THREE.Group();
   const hazardMarkers = new THREE.Group();
   scene.add(hazardMarkers);
@@ -343,6 +347,7 @@ function createOceanScene(
   }
   function applyViewMode() {
     const volumeVisible = sceneFigureMode === "volume";
+    const solidVisible = sceneFigureMode === "solid";
     planes.forEach((plane, index) => {
       plane.visible = volumeVisible && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
     });
@@ -353,6 +358,7 @@ function createOceanScene(
     currentParticles.points.visible = volumeVisible && sceneViewMode === "composite" && sceneParticlesEnabled;
     frame.visible = volumeVisible && sceneViewMode === "composite";
     if (reliefMesh) reliefMesh.visible = sceneFigureMode === "relief";
+    solidVolume.group.visible = solidVisible;
     volumeContourGroup.visible = volumeVisible && sceneIsothermContoursEnabled && scenePayload.variable === "thetao";
     volumeContourGroup.children.forEach((contour, index) => {
       contour.visible = volumeContourGroup.visible && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
@@ -582,6 +588,7 @@ function createOceanScene(
         textures[index].needsUpdate = true;
       });
       isosurface.updateVolume(nextPayload, nextRange);
+      solidVolume.update(nextPayload, nextRange);
       rebuildReliefFigure();
       rebuildIsothermContours();
     },
@@ -596,6 +603,7 @@ function createOceanScene(
     },
     setVerticalExaggeration(exaggeration) {
       positionDepthLayers(exaggeration);
+      solidVolume.setVerticalExaggeration(exaggeration);
     },
     setIsosurfaceVisible(visible) {
       sceneIsosurfaceEnabled = visible;
@@ -658,6 +666,7 @@ function createOceanScene(
       frame.material.dispose();
       bathymetryMesh?.geometry.dispose();
       bathymetryMesh?.material.dispose();
+      solidVolume.dispose();
       disposeFigureMesh(reliefMesh);
       renderer.dispose();
       renderer.domElement.remove();

@@ -1,5 +1,11 @@
 # Phase Log
 
+## Temperature solid volume figure
+
+- **Status:** Complete.
+- **Implementation:** Added a third mutually exclusive 3D figure, `Temperature solid volume`, to the existing figure list. It uses dense Marching Cubes geometry over the loaded model layers with trilinear field sampling, nested temperature bands, increased depth thickness, and shared camera/data/color controls. It does not stack 2D planes.
+- **Manual verification:** Open `/explorer`, select Temperature, choose `Temperature solid volume` under 3D figure, and rotate/zoom the result. Confirm it appears as a continuous thick 3D scalar-field body, not separated flat images. Change depth/date/color range/vertical exaggeration and confirm the body rebuilds from the loaded data. Open its `i` button and confirm the explanation is shown.
+
 
 ## Isotherm Contour Toggle
 
