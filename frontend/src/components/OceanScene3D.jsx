@@ -154,6 +154,9 @@ function createOceanScene(
   );
   scene.add(frame);
   let bathymetryMesh = null;
+  let sceneViewMode = "composite";
+  let sceneIsosurfaceEnabled = isosurfaceEnabled;
+  let sceneParticlesEnabled = false;
   let selectedDepthIndex = 0;
   let layerOpacity = opacity;
 
@@ -165,6 +168,17 @@ function createOceanScene(
     frame.scale.z = exaggeration;
     frame.position.z = STACK_HEIGHT / 2 - (STACK_HEIGHT * exaggeration) / 2;
     isosurface.setVerticalExaggeration(exaggeration);
+  }
+  function applyViewMode() {
+    planes.forEach((plane, index) => {
+      plane.visible = sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex);
+    });
+    if (bathymetryMesh) bathymetryMesh.visible = sceneViewMode === "composite" || sceneViewMode === "bathymetry";
+    isosurface.mesh.visible = sceneViewMode === "isosurface" || (sceneViewMode === "composite" && sceneIsosurfaceEnabled);
+    instrumentMarkers.visible = sceneViewMode === "composite" || sceneViewMode === "instruments";
+    hazardMarkers.visible = sceneViewMode === "composite";
+    currentParticles.points.visible = sceneViewMode === "composite" && sceneParticlesEnabled;
+    frame.visible = sceneViewMode === "composite";
   }
   positionDepthLayers(verticalExaggeration);
 
@@ -249,6 +263,7 @@ function createOceanScene(
       bathymetryMesh = new THREE.Mesh(meshGeometry, new THREE.MeshStandardMaterial({ color: 0x47798a, roughness: 0.9, metalness: 0, flatShading: false, side: THREE.DoubleSide }));
       bathymetryMesh.renderOrder = -10;
       scene.add(bathymetryMesh);
+      applyViewMode();
     },
     setCyclones(events) {
       hazardMarkers.clear();
@@ -290,7 +305,8 @@ function createOceanScene(
       currentParticles.setField(field);
     },
     setParticlesVisible(visible) {
-      currentParticles.points.visible = visible;
+      sceneParticlesEnabled = visible;
+      applyViewMode();
     },
     setInstruments(instruments) {
       instrumentMarkers.clear();
@@ -353,7 +369,9 @@ function createOceanScene(
       positionDepthLayers(exaggeration);
     },
     setIsosurfaceVisible(visible) {
+      sceneIsosurfaceEnabled = visible;
       isosurface.setVisible(visible);
+      applyViewMode();
     },
     setIsosurfaceThreshold(threshold) {
       isosurface.setThreshold(threshold);
@@ -370,6 +388,11 @@ function createOceanScene(
       planes.forEach((plane, index) => {
         plane.renderOrder = index === selectedIndex ? payload.layers.length + 1 : index;
       });
+      applyViewMode();
+    },
+    setViewMode(mode) {
+      sceneViewMode = mode;
+      applyViewMode();
     },
     dispose() {
       cancelAnimationFrame(animationFrame);
@@ -431,6 +454,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [profileEnlarged, setProfileEnlarged] = useState(false);
   const [infoTopic, setInfoTopic] = useState(null);
   const [cycloneStatus, setCycloneStatus] = useState("off");
+  const [viewMode, setViewMode] = useState("composite");
 
   useEffect(() => { setVariable(initialVariable); }, [initialVariable]);
 
@@ -557,6 +581,10 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   useEffect(() => {
     sceneApiRef.current?.setIsosurfaceVisible(isosurfaceEnabled);
   }, [isosurfaceEnabled]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setViewMode(viewMode);
+  }, [viewMode]);
 
   useEffect(() => {
     sceneApiRef.current?.setIsosurfaceThreshold(isosurfaceThreshold);
@@ -717,7 +745,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         }
       }}>
         <div className="panel-header"><h2>Visual controls</h2><span className="step-label">01 · Configure</span></div>
-        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} uploadSelected={dataSource === "upload"} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} />}
+        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} uploadSelected={dataSource === "upload"} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} viewMode={viewMode} onViewModeChange={setViewMode} />}
         {payload && selectedTimeIndex !== null && <DepthTimeSlider depths={payload.layers.map((layer) => layer.depth)} selectedDepthIndex={selectedDepthIndex} onDepthChange={setSelectedDepthIndex} times={times} selectedTimeIndex={selectedTimeIndex} onTimeChange={handleTimeChange} isUpdating={isUpdating} onInfoOpen={setInfoTopic} />}
         {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p><div className="hazard-row"><strong>Cyclone tracking</strong><span className="hazard-status">{cycloneStatus === "loading" ? "Checking GDACS…" : cycloneStatus}</span></div><small className="source-note">Source: GDACS public events API</small></section>}
       </aside>

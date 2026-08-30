@@ -285,6 +285,8 @@ body { background: radial-gradient(circle at 72% 0%, rgba(43,174,191,.11), trans
 .control-sidebar .segmented { margin-top: 10px; padding: 3px; border: 1px solid #d5e3e8; background: #edf4f7; }
 .control-sidebar .segmented button { min-height: 30px; color: #5a7484; font-weight: 600; }
 .control-sidebar .segmented button.active { color: #fff; background: #07899d; }
+.view-select-label { display: block; margin-bottom: 7px; color: #587487; font-size: .72rem; }
+.view-select { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid #c7dbe2; border-radius: 7px; background: #f8fbfc; color: #123650; font-size: .78rem; font-weight: 600; }
 .segmented { background: #eaf1f5; }
 .segmented button { color: #577083; }
 .segmented button.active { color: #fff; background: var(--cyan); box-shadow: 0 2px 8px rgba(7,137,157,.2); }

@@ -443,6 +443,33 @@ shallowing near the coast) instead of a flat plane, and that this holds
 up whether viewing the demo dataset or an uploaded dataset covering the
 same region.
 
+### Phase 17 — Layer Isolation / Focus View
+Currently every element (depth-stack planes, bathymetry, instrument
+markers, isosurface) renders simultaneously, which can make it hard to
+study one thing clearly — e.g. the bathymetry becomes visible through
+the temperature planes. This phase adds a way to view one layer cleanly
+without needing multiple separate 3D renderers (which would be
+redundant and heavier on performance); it isolates visibility within the
+existing single scene instead.
+
+- Add a "View" selector with options: **Composite** (today's default,
+  everything shown together), **Bathymetry only**, **Selected depth
+  layer only** (just the one highlighted plane, not the full 8-layer
+  stack), **Isosurface only**, **Instruments only**.
+- Selecting a mode hides/dims everything except the chosen layer(s) via
+  visibility toggles on the existing Three.js objects — no new scene,
+  camera, or renderer.
+- Camera position, rotation, zoom, and all controls remain exactly as
+  they were when switching modes — only visibility changes.
+- Composite mode must remain the default so nothing breaks for someone
+  who never touches this control.
+
+**Manual test:** switch to "Bathymetry only" and confirm the seafloor is
+now clearly visible with nothing else drawn over or through it; switch
+to "Selected depth layer only" and confirm just one clean plane shows;
+switch back to Composite and confirm everything reappears exactly as
+before.
+
 ---
 
 ## 8. Demo Script for Judges (~5–6 minutes)

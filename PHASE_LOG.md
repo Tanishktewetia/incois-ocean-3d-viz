@@ -477,6 +477,15 @@
 - **Manual verification:** Upload each model slot independently and confirm its Ready state, selected field, 2D preview, 3D layers, and extent update without uploading the other fields. Upload a CSV/NetCDF point file and confirm the instrument catalog shows `uploaded` provenance. Open the Explorer with backend running, confirm the hazard status is honest, and when GDACS returns an in-extent active cyclone confirm its red track/marker appears; otherwise confirm the no-active or unavailable message. Confirm no PFZ layer or fabricated fishing-zone shape appears.
 - **Automated validation:** Backend byte-compilation and all 29 existing `unittest` tests pass. Frontend production build passes with only Vite's existing non-fatal large-chunk advisory. `git diff --check` passes.
 
+## Phase 17 - Layer Isolation View Mode
+
+- **Status:** Complete.
+- **Implementation:** Added a Composite/Bathymetry only/Selected depth layer only/Isosurface only/Instruments only selector. Every mode reuses the existing Three.js scene, camera, controls, and renderer; it changes only visibility on the existing planes, GEBCO mesh, isosurface, instrument group, current particles, cyclone group, and wireframe.
+- **Behavior:** Composite remains the default. Camera position, rotation, zoom, data requests, and layer data remain unchanged when switching focus modes. The selected-depth mode follows the currently highlighted depth layer, including after the depth slider changes.
+- **Files changed:** `frontend/src/components/VisualizationControls.jsx`, `frontend/src/components/OceanScene3D.jsx`, `frontend/src/styles.css`, `PHASE_LOG.md`.
+- **Manual verification:** In Explorer, switch through each View option and confirm only the requested existing objects are visible. Confirm Bathymetry only shows the GEBCO floor, Selected depth layer only shows one plane, Isosurface only shows the isosurface, and Instruments only shows markers. Return to Composite and confirm all layers return. Rotate, pan, zoom, change depth, and change variables before and after switching; confirm the same camera and data behavior remain.
+- **Automated validation:** Frontend production build passes and `git diff --check` passes.
+
 ## Phase 16 - Real GEBCO Seafloor Bathymetry
 
 - **Status:** Complete.

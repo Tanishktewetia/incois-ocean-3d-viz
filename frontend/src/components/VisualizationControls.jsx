@@ -5,6 +5,7 @@ const VARIABLES = [
   ["so", "Salinity", "PSU", "S"],
   ["current_magnitude", "Currents", "m/s", "↗"],
 ];
+const VIEW_MODES = [["composite", "Composite"], ["bathymetry", "Bathymetry only"], ["depth", "Selected depth layer only"], ["isosurface", "Isosurface only"], ["instruments", "Instruments only"]];
 
 function VisualizationControls({
   variable, onVariableChange, minimum, maximum, unit, onRangeChange,
@@ -12,6 +13,7 @@ function VisualizationControls({
   onVerticalExaggerationChange, isosurfaceEnabled, onIsosurfaceEnabledChange,
   isosurfaceThreshold, onIsosurfaceThresholdChange, uploadSelected, error,
   backgroundColor, onBackgroundColorChange, onInfoOpen,
+  viewMode, onViewModeChange,
 }) {
   return (
     <>
@@ -25,6 +27,15 @@ function VisualizationControls({
           ))}
         </div>
         {uploadSelected && <p className="status-copy">Uploads provide temperature only; other fields use Copernicus Marine.</p>}
+      </section>
+
+      <section className="control-section" aria-labelledby="view-control-title">
+        <div className="control-kicker" id="view-control-title">View</div>
+        <label className="view-select-label" htmlFor="layer-view-mode">Focus the existing 3D scene</label>
+        <select id="layer-view-mode" className="view-select" value={viewMode} onChange={(event) => onViewModeChange(event.target.value)} aria-label="3D layer isolation view">
+          {VIEW_MODES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+        </select>
+        <p className="status-copy">Visibility only — camera and data stay unchanged.</p>
       </section>
 
       <section className="control-section" aria-labelledby="color-control-title">
