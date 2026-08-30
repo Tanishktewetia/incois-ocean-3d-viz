@@ -10,6 +10,7 @@ from backend.services.slicer import (
     save_upload_stream,
 )
 from backend.services.bathymetry import get_bathymetry
+from backend.services.comparison import extract_temperature_profile, sample_temperature_transect
 
 router = APIRouter(prefix="/api", tags=["ocean"])
 
@@ -41,6 +42,11 @@ def upload_dataset(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(error),
         ) from error
+    except OceanDataUnavailableError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(error),
+        ) from error
     finally:
         file.file.close()
 
@@ -52,11 +58,6 @@ def get_currents(time: str | None = None) -> dict[str, Any]:
     except ValueError as error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        ) from error
-    except OceanDataUnavailableError as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(error),
         ) from error
 
@@ -93,7 +94,25 @@ def get_layers(
             detail=str(error),
         ) from error
     except OceanDataUnavailableError as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(error),
-        ) from error
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+
+
+@router.get("/temperature/profile")
+def temperature_profile(latitude: float, longitude: float, source: str = "demo", time: str | None = None) -> dict[str, Any]:
+    try:
+        return extract_temperature_profile(latitude, longitude, source, time)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    except OceanDataUnavailableError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+
+
+@router.get("/temperature/transect")
+def temperature_transect(start_latitude: float, start_longitude: float, end_latitude: float, end_longitude: float,
+                          samples: int = 32, source: str = "demo", time: str | None = None) -> dict[str, Any]:
+    try:
+        return sample_temperature_transect(start_latitude, start_longitude, end_latitude, end_longitude, samples, source, time)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+    except OceanDataUnavailableError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error

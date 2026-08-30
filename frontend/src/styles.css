@@ -131,6 +131,11 @@ input[type="range"] { width: 100%; height: 3px; margin: 7px 0; accent-color: var
 .scene-legend-bar { height: 10px; border: 1px solid rgba(255,255,255,.28); border-radius: 5px; background: linear-gradient(90deg, rgb(0,29,108), rgb(0,170,220), rgb(255,224,92), rgb(205,38,38)); }
 .scene-legend-scale { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; color: #d5edf1; font-variant-numeric: tabular-nums; }
 .toggle-unit { margin-left: 5px; color: #628393; font-size: .68rem; font-weight: 600; letter-spacing: .02em; text-transform: none; }
+.toggle-label-with-info { display: inline-flex; align-items: center; gap: 7px; }
+.toggle-label-with-info .info-tip { width: 16px; height: 16px; font-size: .62rem; }
+.toggle-switch { padding: 0; border: 0; cursor: pointer; }
+.toggle-switch.active { background: #60bfca; }
+.toggle-switch.active::after { left: 18px; background: #fff; box-shadow: 0 1px 4px rgba(25,72,96,.24); }
 .figure-button-row { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 6px; align-items: center; }
 .figure-button-row .figure-button { min-width: 0; }
 .figure-button-row > .info-tip { align-self: start; margin-top: 9px; }
@@ -639,3 +644,25 @@ footer { color: #657d8e; background: #fff; }
 .model-tabs button.active small { color: #397d89; }
 @media (max-width: 1100px) { .model-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .model-selector-heading { display: block; } .model-selector-heading span { display: block; margin-top: 4px; } .model-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.temperature-explorer-page { max-width: 1500px; margin: 0 auto; padding: 34px 40px 70px; }
+.temperature-explorer-page .page-intro { margin-bottom: 24px; }
+.temperature-explorer-grid { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(320px, 1fr) minmax(520px, 1.7fr); gap: 16px; align-items: stretch; }
+.temperature-minimap, .temperature-profile-panel, .temperature-transect-panel { background: #fff; border: 1px solid #c8e0e8; border-radius: 16px; padding: 18px; box-shadow: 0 12px 28px rgba(20, 65, 86, .07); }
+.dedicated-heading { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; border-bottom: 1px solid #d9e9ee; padding-bottom: 12px; margin-bottom: 14px; }
+.dedicated-heading h2 { margin: 3px 0 0; font-size: 1.1rem; }
+.dedicated-heading > span { color: #5d7890; font-size: .78rem; text-align: right; }
+.temperature-minimap .data-card { border: 0; box-shadow: none; padding: 0; }
+.temperature-minimap .data-card-heading, .temperature-minimap .heatmap-meta { display: none; }
+.temperature-minimap .heatmap-canvas { width: 100%; height: 230px; object-fit: contain; cursor: crosshair; }
+.section-controls { border-top: 1px solid #d9e9ee; margin-top: 14px; padding-top: 14px; display: grid; gap: 8px; }
+.section-controls label { color: #173c59; font-weight: 700; font-size: .82rem; }
+.section-controls select { border: 1px solid #bdd7e0; border-radius: 8px; padding: 9px; color: #173c59; background: #f8fcfd; }
+.section-controls small, .temperature-transect-panel small { color: #668097; line-height: 1.4; }
+.scientific-chart { width: 100%; height: 250px; }
+.scientific-chart line { stroke: #7b9bab; stroke-width: 1; }
+.scientific-chart text { fill: #5b748a; font-size: 11px; }
+.empty-state { color: #668097; min-height: 200px; display: grid; place-items: center; text-align: center; }
+.temperature-explorer-page > .ocean-workspace { margin-top: 18px; }
+@media (max-width: 1100px) { .temperature-explorer-grid { grid-template-columns: 1fr 1fr; } .temperature-transect-panel { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .temperature-explorer-page { padding: 24px 16px 50px; } .temperature-explorer-grid { grid-template-columns: 1fr; } .temperature-transect-panel { grid-column: auto; } }

@@ -25,6 +25,12 @@ export const CONTROL_INFO = {
     how: "Select a depth, rotate or zoom the surface, and change the variable, date, color range, or scale to examine a different field. Hover the surface to read the underlying value and geographic position.",
     detail: "This is a visualization transform of real model values, not terrain or invented bathymetry. Missing cells remain holes so the surface does not imply data where none was provided.",
   },
+  isotherm: {
+    title: "Isotherm contours",
+    what: "Thin lines marking equal temperature values across the loaded temperature field. Each line is an isotherm, and the fixed interval is 2 °C.",
+    how: "Enable the toggle while Temperature is selected. In the layered volume, contours appear on the available depth layers; in the field-relief figure, they follow the selected depth surface. Change depth, date, or the temperature range to update the lines.",
+    detail: "Contour positions are interpolated from the actual loaded temperature grid. They are a visual guide to temperature gradients, not additional measurements. The toggle is available only for temperature and is off by default.",
+  },
   color: {
     title: "Color range",
     what: "Maps numeric data values to the blue-to-red color scale.",

@@ -103,6 +103,22 @@ export async function getOceanCurrents({ time, signal } = {}) {
   return response.json();
 }
 
+export async function getTemperatureProfile({ latitude, longitude, source = "demo", time, signal }) {
+  const parameters = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude), source });
+  if (time) parameters.set("time", time);
+  const response = await fetch(`/api/temperature/profile?${parameters}`, { signal });
+  if (!response.ok) throw new Error(`Temperature profile request failed with status ${response.status}`);
+  return response.json();
+}
+
+export async function getTemperatureTransect({ startLatitude, startLongitude, endLatitude, endLongitude, samples = 32, source = "demo", time, signal }) {
+  const parameters = new URLSearchParams({ start_latitude: String(startLatitude), start_longitude: String(startLongitude), end_latitude: String(endLatitude), end_longitude: String(endLongitude), samples: String(samples), source });
+  if (time) parameters.set("time", time);
+  const response = await fetch(`/api/temperature/transect?${parameters}`, { signal });
+  if (!response.ok) throw new Error(`Temperature transect request failed with status ${response.status}`);
+  return response.json();
+}
+
 export async function getArgoProfiles({ signal } = {}) {
   const response = await fetch("/api/argo", { signal });
   if (!response.ok) {

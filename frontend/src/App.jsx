@@ -6,6 +6,7 @@ import OceanScene3D from "./components/OceanScene3D.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
 import ComparisonPage from "./pages/ComparisonPage.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
+import TemperatureVolumeExplorerPage from "./pages/TemperatureVolumeExplorerPage.jsx";
 
 function Brand() {
   return (
@@ -21,6 +22,7 @@ function AppHeader({ connectionStatus }) {
   const onExplorerPage = window.location.pathname === "/explorer";
   const onAboutPage = window.location.pathname === "/about";
   const onComparisonPage = window.location.pathname === "/comparison";
+  const onTemperaturePage = window.location.pathname === "/temperature-volume";
   const connected = connectionStatus === "Backend connected";
   return (
     <header className="app-header">
@@ -30,6 +32,7 @@ function AppHeader({ connectionStatus }) {
         <a className={onExplorerPage ? "active" : ""} href="/explorer">Explorer</a>
         <a className={onAboutPage ? "active" : ""} href="/about">Mission & impact</a>
         <a className={onComparisonPage ? "active" : ""} href="/comparison">Comparison</a>
+        <a className={onTemperaturePage ? "active" : ""} href="/temperature-volume">Temperature volume</a>
       </nav>
       <div className={`connection-pill ${connected ? "connected" : ""}`} role="status">
         <span aria-hidden="true" />{connectionStatus}
@@ -76,6 +79,10 @@ function App() {
         <ComparisonPage />
       </div>
     );
+  }
+
+  if (window.location.pathname === "/temperature-volume") {
+    return <div className="app-shell"><AppHeader connectionStatus={connectionStatus} /><TemperatureVolumeExplorerPage /></div>;
   }
 
   return (

@@ -47,6 +47,8 @@ function createOceanScene(
   onInstrumentSelect,
   onInstrumentHover,
   onDataHover,
+  onDataSelect,
+  sliceDepth,
   presentation,
   reducedMotion,
 ) {
@@ -170,6 +172,7 @@ function createOceanScene(
 
     const plane = new THREE.Mesh(geometry, material);
     plane.position.z = STACK_HEIGHT / 2 - (layer.depth / maximumDepth) * STACK_HEIGHT;
+    plane.userData.depth = layer.depth;
     plane.renderOrder = payload.layers.length - payload.layers.indexOf(layer);
     scene.add(plane);
     planes.push(plane);
@@ -344,7 +347,7 @@ function createOceanScene(
   function applyViewMode() {
     const volumeVisible = sceneFigureMode === "volume";
     planes.forEach((plane, index) => {
-      plane.visible = volumeVisible && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
+      plane.visible = volumeVisible && (sliceDepth == null || plane.userData.depth <= sliceDepth) && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
     });
     if (bathymetryMesh) bathymetryMesh.visible = volumeVisible && (sceneViewMode === "composite" || sceneViewMode === "bathymetry");
     isosurface.mesh.visible = volumeVisible && (sceneViewMode === "isosurface" || (sceneViewMode === "composite" && sceneIsosurfaceEnabled));
@@ -371,6 +374,14 @@ function createOceanScene(
     const hit = raycaster.intersectObjects(instrumentMarkers.children, true)[0];
     if (hit) {
       onInstrumentSelect(hit.object.userData.instrument.id);
+      return;
+    }
+    const dataHit = raycaster.intersectObjects(planes, false).find((intersection) => intersection.object.visible && intersection.uv);
+    if (dataHit && onDataSelect) {
+      const column = Math.max(0, Math.min(payload.longitudes.length - 1, Math.round(dataHit.uv.x * (payload.longitudes.length - 1))));
+      const row = Math.max(0, Math.min(payload.latitudes.length - 1, Math.round(dataHit.uv.y * (payload.latitudes.length - 1))));
+      const value = payload.layers[planes.indexOf(dataHit.object)]?.values[row]?.[column];
+      if (Number.isFinite(value)) onDataSelect({ latitude: payload.latitudes[row], longitude: payload.longitudes[column], value });
     }
   }
   function handlePointerMove(event) {
@@ -631,6 +642,10 @@ function createOceanScene(
       sceneFigureMode = mode;
       applyViewMode();
     },
+    setSliceDepth(depth) {
+      sliceDepth = depth;
+      applyViewMode();
+    },
     dispose() {
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("click", handlePointerClick);
@@ -663,7 +678,7 @@ function createOceanScene(
   };
 }
 
-function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false }) {
+function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false, onDataSelect, sliceDepth = null }) {
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
   const sceneApiRef = useRef(null);
@@ -807,6 +822,8 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         setSelectedInstrumentId,
         setHoveredInstrument,
         setHoveredData,
+        onDataSelect,
+        null,
         presentation,
         reducedMotion,
       );
@@ -814,6 +831,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
       if (landImageRef.current) sceneApiRef.current.setLandImagery(landImageRef.current);
       sceneApiRef.current.highlightDepth(selectedDepthIndex);
       sceneApiRef.current.setFigureMode(figureMode);
+      sceneApiRef.current.setSliceDepth(sliceDepth);
     } else {
       sceneApiRef.current.updateLayers(payload, range, scale);
     }
@@ -859,6 +877,10 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   useEffect(() => {
     sceneApiRef.current?.setIsothermContoursVisible(isothermContoursEnabled);
   }, [isothermContoursEnabled]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setSliceDepth(sliceDepth);
+  }, [sliceDepth]);
 
   useEffect(() => {
     sceneApiRef.current?.selectInstrument(selectedInstrumentId);

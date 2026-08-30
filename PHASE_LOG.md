@@ -1,5 +1,14 @@
 # Phase Log
 
+## Phase 20 — Temperature Volume Explorer
+
+- **Status:** Complete.
+- **Dedicated route:** Added `/temperature-volume` with its own state, India EEZ minimap, real-data 3D temperature volume, point profile panel, transect cross-section panel, and slice-from-top control. The existing `/explorer` composite remains unchanged in its workflow.
+- **Backend:** Added `/api/temperature/profile` and `/api/temperature/transect`. Both select the existing Copernicus `thetao` field and reuse Phase 6's `bilinear_profile` helper; the transect samples a straight lat/lon path and returns the interpolated depth-by-distance matrix.
+- **Provenance:** Profile, transect, minimap, and volume values come from the existing Copernicus temperature dataset. No additional data source or fabricated values were added.
+- **Manual verification:** Start both servers, open `/temperature-volume`, click a 3D surface or minimap location and confirm the profile panel shows a temperature/depth curve with the selected coordinates. Click two minimap points and confirm the transect panel renders a spatially varying temperature/depth cross-section. Change Slice from top and confirm only real model levels are selectable and deeper layers are hidden; use existing vertical exaggeration and Isotherm contours controls together and confirm they continue to affect the 3D figure.
+- **Automated validation:** Frontend production build passes; Python files compile; `git diff --check` passes. The configured environments do not have `pytest` installed, so the backend test suite could not be run in this shell.
+
 ## Isotherm Contour Toggle
 
 - **Status:** Complete.

@@ -577,6 +577,56 @@ honesty rules.
 imagery instead of empty space, ocean data coloring is unchanged, and
 existing depth/time/layer controls still work exactly as before.
 
+### Phase 20 — Figure: Temperature Volume Explorer
+A single, dedicated, fully self-contained figure matching the specific
+reference layout the team was shown, not a shared/reused panel inside
+the composite Explorer. This combines pieces already built with two
+genuinely new backend capabilities.
+
+**Layout (all in one dedicated page/route):**
+1. **Map view** — small 2D minimap (reuse the existing 2D heatmap
+   component at a small size) showing the India EEZ region outline.
+2. **3D Volume** — the main interactive scene (reuse the existing
+   Temperature Volume figure/rendering — real data, real GEBCO
+   seafloor, real depth layers).
+3. **Profile panel** — clicking a point in the 3D volume (or minimap)
+   pins that lat/lon and shows a vertical temperature-vs-depth line
+   chart for the model field **at that exact point**. **New backend
+   work:** a "profile at point" endpoint that extracts/interpolates the
+   model's vertical column at a given lat/lon (simpler than a full
+   transect — reuse the bilinear interpolation already built for
+   Phase 6's Argo-vs-model comparison, applied to one point instead of
+   many).
+4. **Transect panel** — user picks two lat/lon points (or drags a line
+   on the minimap); shows a vertical cross-section (distance along the
+   line vs. depth, colored by temperature) between them. **New backend
+   work:** sampling/interpolating the model field along an arbitrary
+   line — same interpolation approach as the point profile above,
+   applied along a sampled path between the two points.
+5. **Section controls (sidebar):** depth "slice from top" cut (new —
+   caps the visible volume at a chosen depth, snapped to real model
+   levels), vertical exaggeration (reuse existing), isotherm contours
+   (reuse the toggle just added).
+6. **Scale/colorbar** — reuse existing.
+
+**Rules:**
+- Every value shown (profile, transect, minimap, volume) must come from
+  the real Copernicus temperature data already in the app — no
+  fabricated points or interpolation beyond what's scientifically
+  standard (bilinear/linear).
+- This is one dedicated figure with its own state — it does not need to
+  share configuration with the composite Explorer or other Phase 17
+  figures.
+- Reuse existing camera/controls, color scale, and data-fetching
+  patterns; don't create a new rendering engine.
+
+**Manual test:** click different points in the 3D volume and confirm the
+Profile panel updates with a real, sensible vertical temperature curve
+for that location; draw a transect between two points and confirm the
+cross-section reflects real spatial temperature variation (not a
+straight interpolation-free guess); confirm slice-from-top, vertical
+exaggeration, and isotherms all work together in this dedicated figure.
+
 ---
 
 ## 8. Demo Script for Judges (~5–6 minutes)

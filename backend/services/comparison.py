@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 
 from backend.services.metrics import calculate_rmse
-from backend.services.slicer import OceanDataUnavailableError, get_dataset
+from backend.services.slicer import OceanDataUnavailableError, get_dataset, select_variable
 
 
 def bilinear_profile(
@@ -138,4 +138,59 @@ def compare_model_to_profile(profile: dict[str, Any]) -> dict[str, Any]:
             [point["observed_temperature"] for point in comparison_points],
             [point["model_temperature"] for point in comparison_points],
         ),
+    }
+
+
+def _temperature_field(source: str = "demo", time: str | None = None):
+    field = select_variable("thetao", source)
+    try:
+        return field.sel(time=np.datetime64(time.removesuffix("Z")), method="nearest") if time else field.isel(time=-1)
+    except (KeyError, OSError, TypeError, ValueError) as error:
+        raise OceanDataUnavailableError("Unable to select the Copernicus temperature time.") from error
+
+
+def extract_temperature_profile(latitude: float, longitude: float, source: str = "demo", time: str | None = None) -> dict[str, Any]:
+    """Return a bilinearly interpolated vertical temperature column at one point."""
+    selected = _temperature_field(source, time)
+    try:
+        values = bilinear_profile(selected.values, selected.latitude.values, selected.longitude.values, latitude, longitude)
+    except (AttributeError, TypeError, ValueError) as error:
+        raise OceanDataUnavailableError("Requested profile point is outside the model grid.") from error
+    depths = np.asarray(selected.depth.values, dtype=float)
+    valid = np.isfinite(depths) & np.isfinite(values)
+    return {
+        "variable": "thetao", "source": source, "unit": selected.attrs.get("units", "degree_Celsius"),
+        "time": np.datetime_as_string(selected.time.values, unit="s") + "Z",
+        "latitude": latitude, "longitude": longitude,
+        "depths": depths[valid].tolist(), "temperatures": values[valid].tolist(),
+        "horizontal_interpolation": "bilinear; finite ocean corners renormalized",
+    }
+
+
+def sample_temperature_transect(start_latitude: float, start_longitude: float, end_latitude: float, end_longitude: float,
+                                samples: int = 32, source: str = "demo", time: str | None = None) -> dict[str, Any]:
+    """Sample a straight lat/lon path using the same bilinear column interpolation."""
+    if samples < 2 or samples > 256:
+        raise ValueError("samples must be between 2 and 256.")
+    selected = _temperature_field(source, time)
+    latitudes = np.linspace(start_latitude, end_latitude, samples)
+    longitudes = np.linspace(start_longitude, end_longitude, samples)
+    columns = []
+    try:
+        for latitude, longitude in zip(latitudes, longitudes, strict=True):
+            columns.append(bilinear_profile(selected.values, selected.latitude.values, selected.longitude.values, float(latitude), float(longitude)))
+    except (AttributeError, TypeError, ValueError) as error:
+        raise OceanDataUnavailableError("Transect endpoints must be inside the model grid.") from error
+    depths = np.asarray(selected.depth.values, dtype=float)
+    matrix = np.asarray(columns, dtype=float).T
+    valid_depth = np.isfinite(depths)
+    distances = np.sqrt(((latitudes - start_latitude) * 111.32) ** 2 + ((longitudes - start_longitude) * 111.32 * np.cos(np.radians((start_latitude + end_latitude) / 2))) ** 2)
+    matrix = np.where(np.isfinite(matrix), matrix, np.nan)
+    return {
+        "variable": "thetao", "source": source, "unit": selected.attrs.get("units", "degree_Celsius"),
+        "time": np.datetime_as_string(selected.time.values, unit="s") + "Z",
+        "start": {"latitude": start_latitude, "longitude": start_longitude},
+        "end": {"latitude": end_latitude, "longitude": end_longitude},
+        "distances_km": distances.tolist(), "depths": depths[valid_depth].tolist(),
+        "temperatures": matrix[valid_depth].tolist(), "horizontal_interpolation": "bilinear; finite ocean corners renormalized",
     }
