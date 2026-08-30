@@ -40,6 +40,8 @@ function createOceanScene(
   backgroundColor,
   onInstrumentSelect,
   onInstrumentHover,
+  presentation,
+  reducedMotion,
 ) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(backgroundColor);
@@ -60,6 +62,8 @@ function createOceanScene(
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
   controls.target.set(0, 0, 0);
+  controls.autoRotate = presentation && !reducedMotion;
+  controls.autoRotateSpeed = 0.35;
   controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
   controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
   controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
@@ -84,6 +88,7 @@ function createOceanScene(
     planeWidth: PLANE_WIDTH,
     planeHeight,
     surfaceZ: STACK_HEIGHT / 2,
+    particleCount: presentation ? 96 : CURRENT_PARTICLE_COUNT,
   });
   scene.add(currentParticles.points);
   const isosurface = createIsosurface(payload, range, PLANE_WIDTH, planeHeight, STACK_HEIGHT);
@@ -424,7 +429,7 @@ function createOceanScene(
   };
 }
 
-function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0 }) {
+function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false }) {
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
   const sceneApiRef = useRef(null);
@@ -447,7 +452,8 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [hoveredInstrument, setHoveredInstrument] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
-  const [particlesEnabled, setParticlesEnabled] = useState(false);
+  const reducedMotion = presentation && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [particlesEnabled, setParticlesEnabled] = useState(presentation && !reducedMotion);
   const [currentField, setCurrentField] = useState(null);
   const [currentStatus, setCurrentStatus] = useState("off");
   const [fullscreenPanel, setFullscreenPanel] = useState(null);
@@ -549,13 +555,15 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         backgroundColor,
         setSelectedInstrumentId,
         setHoveredInstrument,
+        presentation,
+        reducedMotion,
       );
       sceneApiRef.current.setInstruments(instrumentsRef.current);
       sceneApiRef.current.highlightDepth(selectedDepthIndex);
     } else {
       sceneApiRef.current.updateLayers(payload, range, scale);
     }
-  }, [payload, range, scale]);
+  }, [payload, range, scale, presentation, reducedMotion]);
 
   useEffect(() => () => {
     sceneApiRef.current?.dispose();
@@ -737,6 +745,17 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   }, [range]);
 
   const unit = displayUnit(payload);
+  if (presentation) {
+    return (
+      <div className="presentation-scene" aria-label="Live three-dimensional Copernicus ocean model view">
+        <div className="scene-container" ref={containerRef} />
+        {!payload && !error && <div className="loading-overlay"><div className="loading-content"><span className="loading-spinner" /><strong>Loading live ocean layers</strong></div></div>}
+        {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
+        {payload && <div className="region-caption"><strong>Live model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
+        <div className="bathymetry-caption">Seafloor: GEBCO 2026 bathymetry</div>
+      </div>
+    );
+  }
   return (
     <section className="ocean-workspace" aria-labelledby="ocean-scene-title">
       <aside className="control-sidebar" aria-label="Visualization controls" onClick={(event) => {

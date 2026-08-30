@@ -470,6 +470,45 @@ to "Selected depth layer only" and confirm just one clean plane shows;
 switch back to Composite and confirm everything reappears exactly as
 before.
 
+### Phase 18 — Landing Page
+A focused front door for the site, not a second application. No new
+image-generation service, no scroll-jacked cinematic engine, no
+duplicated 3D storytelling — reuse what already exists.
+
+- New route `/` with five sections, in order:
+  1. **Hero** — headline + one-line description (reuse existing wording
+     from the Mission & Impact page, don't invent new copy), primary CTA
+     "Explore OceanScope" (links to `/explorer`), secondary CTA "See how
+     it works" (links to `/about` or `/comparison`). Background: the
+     existing `OceanScene3D` component mounted in a lightweight, mostly
+     idle-rotating mode with reduced particle count — not a new bespoke
+     visual.
+  2. **The problem** — condensed version of the existing "old workflow
+     vs OceanScope" comparison already written for Mission & Impact;
+     reuse that content, don't rewrite it.
+  3. **What it does** — a simple grid of the real, already-implemented
+     capabilities (variables, RMSE comparison, isosurfaces, real
+     currents, GEBCO bathymetry, upload, OGC endpoints) — short labels,
+     no invented statistics.
+  4. **Proof** — one real screenshot or a small embedded live view of
+     the actual Explorer scene, not a separate generated visual.
+  5. **Final CTA** — repeat the primary CTA.
+- Visual system: reuse the existing light theme, colors, typography,
+  and component patterns already established — do not introduce a new
+  dark cinematic aesthetic that's inconsistent with the rest of the app.
+- Performance: this page must not run more than one Three.js
+  scene/context at a time, must dispose it properly if the user
+  navigates away, and must not slow down `/explorer`.
+- Respect `prefers-reduced-motion`: disable idle rotation/animation when
+  set.
+- Do not modify `/explorer`, `/about`, or `/comparison` — this is an
+  additive new route only.
+
+**Manual test:** load `/`, confirm the hero's 3D background is the real
+reused scene (not a static or generated image) and stays performant;
+confirm both CTAs navigate correctly; confirm `/explorer` still works
+exactly as before; confirm reduced-motion disables the idle animation.
+
 ---
 
 ## 8. Demo Script for Judges (~5–6 minutes)

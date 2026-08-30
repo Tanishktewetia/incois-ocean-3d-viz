@@ -55,9 +55,9 @@ export function sampleCurrent(field, longitude, latitude) {
   return totalWeight > 0 ? [eastward / totalWeight, northward / totalWeight] : null;
 }
 
-export function createCurrentParticles({ planeWidth, planeHeight, surfaceZ }) {
+export function createCurrentParticles({ planeWidth, planeHeight, surfaceZ, particleCount = CURRENT_PARTICLE_COUNT }) {
   const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array(CURRENT_PARTICLE_COUNT * 3);
+  const positions = new Float32Array(particleCount * 3);
   const material = new THREE.PointsMaterial({
     color: 0xe8fbff,
     size: 0.09,
@@ -71,7 +71,7 @@ export function createCurrentParticles({ planeWidth, planeHeight, surfaceZ }) {
   points.renderOrder = 20;
   points.visible = false;
 
-  const particles = Array.from({ length: CURRENT_PARTICLE_COUNT }, () => ({
+  const particles = Array.from({ length: particleCount }, () => ({
     longitude: 0,
     latitude: 0,
     age: 0,
