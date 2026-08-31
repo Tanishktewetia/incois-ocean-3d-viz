@@ -541,10 +541,12 @@ function createOceanScene(
       instrumentMarkers.clear();
       instruments.forEach((instrument) => {
         const markerElevation = {
-          core_argo: 0.18,
-          bgc_argo: 0.4,
-          glider: 0.62,
-          ctd: 0.62,
+          // Keep the marker geometry resting on the surface instead of floating
+          // above the map. The small clearance prevents z-fighting only.
+          core_argo: 0.11,
+          bgc_argo: 0.15,
+          glider: 0.15,
+          ctd: 0.11,
         }[instrument.instrument_type];
         const marker = new THREE.Mesh(
           markerGeometries[instrument.instrument_type],

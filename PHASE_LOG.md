@@ -1,5 +1,12 @@
 # Phase Log
 
+## Fix - Instrument markers floating above the surface
+
+- **Status:** Complete.
+- **Cause:** The sample Glider/CTD coordinates were already valid finite ocean cells. Their apparent placement above the map came from an oversized display-only Z elevation (`0.62`) used for marker visibility, not from land coordinates.
+- **Implementation:** Reduced marker elevations to the corresponding marker half-height plus a minimal clearance, so the purple triangle and cube rest on the ocean surface. Coordinates, sample labels, profiles, and the ocean/land mask are unchanged.
+- **Manual verification:** Open `/explorer`, rotate the 3D scene, and confirm the purple triangle and square sit on the colored ocean surface without visibly floating above it. Confirm both remain clickable and still display `SAMPLE DATA — not live`; verify orange and green markers remain visible and selectable.
+
 ## Fix - Sample Glider/CTD Ocean Placement
 
 - **Status:** Complete.
