@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { getBathymetry, getCyclones, getOceanCurrents, getOceanLayers } from "../api/client.js";
@@ -13,6 +13,8 @@ import {
 } from "../utils/currentParticles.js";
 import { createIsosurface } from "../utils/isosurface.js";
 import { getGibsLandImage } from "../utils/gibsImagery.js";
+import { cropLoadedCurrentField, cropLoadedPayload, normalizeRegionSelection } from "../utils/regionSelection.js";
+import RegionSelector from "./RegionSelector.jsx";
 
 const PLANE_WIDTH = 12;
 const STACK_HEIGHT = 5;
@@ -47,6 +49,7 @@ function createOceanScene(
   onInstrumentSelect,
   onInstrumentHover,
   onDataHover,
+  sliceDepth,
   presentation,
   reducedMotion,
 ) {
@@ -137,8 +140,16 @@ function createOceanScene(
       for (let column = 0; column < result.width; column += 1) {
         const pixelIndex = (row * result.width + column) * 4;
         if (result.pixels[pixelIndex + 3] !== 0) continue;
-        const imageColumn = Math.round((column / Math.max(1, result.width - 1)) * (landImageData.width - 1));
-        const imageRow = Math.round((1 - row / Math.max(1, result.height - 1)) * (landImageData.height - 1));
+        const longitude = payload.longitudes[0]
+          + (column / Math.max(1, result.width - 1)) * longitudeSpan;
+        const latitude = payload.latitudes[0]
+          + (row / Math.max(1, result.height - 1)) * latitudeSpan;
+        const sourceExtent = payload.sourceExtent || {
+          west: payload.longitudes[0], east: payload.longitudes.at(-1),
+          south: payload.latitudes[0], north: payload.latitudes.at(-1),
+        };
+        const imageColumn = Math.round(((longitude - sourceExtent.west) / (sourceExtent.east - sourceExtent.west)) * (landImageData.width - 1));
+        const imageRow = Math.round((1 - (latitude - sourceExtent.south) / (sourceExtent.north - sourceExtent.south)) * (landImageData.height - 1));
         const imageIndex = (imageRow * landImageData.width + imageColumn) * 4;
         result.pixels[pixelIndex] = landImageData.data[imageIndex];
         result.pixels[pixelIndex + 1] = landImageData.data[imageIndex + 1];
@@ -173,6 +184,7 @@ function createOceanScene(
 
     const plane = new THREE.Mesh(geometry, material);
     plane.position.z = STACK_HEIGHT / 2 - (layer.depth / maximumDepth) * STACK_HEIGHT;
+    plane.userData.depth = layer.depth;
     plane.renderOrder = payload.layers.length - payload.layers.indexOf(layer);
     scene.add(plane);
     planes.push(plane);
@@ -347,7 +359,9 @@ function createOceanScene(
   function applyViewMode() {
     const volumeVisible = sceneFigureMode === "volume";
     planes.forEach((plane, index) => {
-      plane.visible = volumeVisible && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
+      plane.visible = volumeVisible
+        && (sliceDepth == null || plane.userData.depth <= sliceDepth)
+        && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
     });
     if (bathymetryMesh) bathymetryMesh.visible = volumeVisible && (sceneViewMode === "composite" || sceneViewMode === "bathymetry");
     isosurface.mesh.visible = volumeVisible && (sceneViewMode === "isosurface" || (sceneViewMode === "composite" && sceneIsosurfaceEnabled));
@@ -358,7 +372,9 @@ function createOceanScene(
     if (reliefMesh) reliefMesh.visible = sceneFigureMode === "relief";
     volumeContourGroup.visible = volumeVisible && sceneIsothermContoursEnabled && scenePayload.variable === "thetao";
     volumeContourGroup.children.forEach((contour, index) => {
-      contour.visible = volumeContourGroup.visible && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
+      contour.visible = volumeContourGroup.visible
+        && (sliceDepth == null || scenePayload.layers[index].depth <= sliceDepth)
+        && (sceneViewMode === "composite" || (sceneViewMode === "depth" && index === selectedDepthIndex));
     });
     reliefContourGroup.visible = sceneFigureMode === "relief" && sceneIsothermContoursEnabled && scenePayload.variable === "thetao";
   }
@@ -448,8 +464,16 @@ function createOceanScene(
         bathymetryMesh.geometry.dispose();
         bathymetryMesh.material.dispose();
       }
-      const rows = bathymetry.latitudes.length;
-      const columns = bathymetry.longitudes.length;
+      const latitudeIndexes = bathymetry.latitudes
+        .map((latitude, index) => (latitude >= payload.latitudes[0] && latitude <= payload.latitudes.at(-1) ? index : -1))
+        .filter((index) => index >= 0);
+      const longitudeIndexes = bathymetry.longitudes
+        .map((longitude, index) => (longitude >= payload.longitudes[0] && longitude <= payload.longitudes.at(-1) ? index : -1))
+        .filter((index) => index >= 0);
+      const elevations = latitudeIndexes.map((row) => longitudeIndexes.map((column) => bathymetry.elevations[row][column]));
+      const rows = elevations.length;
+      const columns = elevations[0]?.length || 0;
+      if (rows < 2 || columns < 2) return;
       const sourceStride = 4;
       const meshRows = Math.ceil((rows - 1) / sourceStride) + 1;
       const meshColumns = Math.ceil((columns - 1) / sourceStride) + 1;
@@ -465,7 +489,7 @@ function createOceanScene(
           let samples = 0;
           for (let latOffset = -smoothRadius; latOffset <= smoothRadius; latOffset += 1) {
             for (let lonOffset = -smoothRadius; lonOffset <= smoothRadius; lonOffset += 1) {
-              const row = bathymetry.elevations[Math.max(0, Math.min(rows - 1, sourceLat + latOffset))];
+              const row = elevations[Math.max(0, Math.min(rows - 1, sourceLat + latOffset))];
               const value = row?.[Math.max(0, Math.min(columns - 1, sourceLon + lonOffset))];
               if (value != null && Number.isFinite(value)) { totalDepth += Math.max(0, -value); samples += 1; }
             }
@@ -543,6 +567,10 @@ function createOceanScene(
     setInstruments(instruments) {
       instrumentMarkers.clear();
       instruments.forEach((instrument) => {
+        if (instrument.longitude < payload.longitudes[0]
+          || instrument.longitude > payload.longitudes.at(-1)
+          || instrument.latitude < payload.latitudes[0]
+          || instrument.latitude > payload.latitudes.at(-1)) return;
         const markerElevation = {
           // Keep the marker geometry resting on the surface instead of floating
           // above the map. The small clearance prevents z-fighting only.
@@ -638,6 +666,10 @@ function createOceanScene(
       sceneFigureMode = mode;
       applyViewMode();
     },
+    setSliceDepth(depth) {
+      sliceDepth = depth;
+      applyViewMode();
+    },
     dispose() {
       cancelAnimationFrame(animationFrame);
       renderer.domElement.removeEventListener("click", handlePointerClick);
@@ -670,13 +702,16 @@ function createOceanScene(
   };
 }
 
-function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false }) {
+function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrumentCount = 0, presentation = false, temperatureOnly = false }) {
   const containerRef = useRef(null);
   const scenePanelRef = useRef(null);
   const sceneApiRef = useRef(null);
   const landImageRef = useRef(null);
   const payloadRef = useRef(null);
   const instrumentsRef = useRef([]);
+  const bathymetryRef = useRef(null);
+  const sceneExtentRef = useRef("");
+  const renderedPayloadRef = useRef(null);
   const [payload, setPayload] = useState(null);
   const [range, setRange] = useState(null);
   const [variable, setVariable] = useState(initialVariable);
@@ -706,6 +741,33 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   const [cycloneStatus, setCycloneStatus] = useState("off");
   const [viewMode, setViewMode] = useState("composite");
   const [figureMode, setFigureMode] = useState("volume");
+  const [regionSelection, setRegionSelection] = useState(null);
+  const [westSliceIndex, setWestSliceIndex] = useState(null);
+  const [sliceDepth, setSliceDepth] = useState(null);
+
+  const normalizedSelection = useMemo(() => payload && normalizeRegionSelection(
+    regionSelection,
+    payload.latitudes.length,
+    payload.longitudes.length,
+  ), [payload, regionSelection]);
+  const effectiveSelection = useMemo(() => {
+    if (!payload) return null;
+    const base = normalizedSelection || {
+      westIndex: 0,
+      eastIndex: payload.longitudes.length - 1,
+      southIndex: 0,
+      northIndex: payload.latitudes.length - 1,
+    };
+    return {
+      ...base,
+      westIndex: Math.min(base.eastIndex - 1, Math.max(base.westIndex, westSliceIndex ?? base.westIndex)),
+    };
+  }, [normalizedSelection, payload, westSliceIndex]);
+  const renderedPayload = useMemo(
+    () => (payload ? cropLoadedPayload(payload, effectiveSelection) : null),
+    [effectiveSelection, payload],
+  );
+  renderedPayloadRef.current = renderedPayload;
 
   useEffect(() => { setVariable(initialVariable); }, [initialVariable]);
 
@@ -725,6 +787,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
     if (!payload) return undefined;
     const controller = new AbortController();
     getBathymetry({ signal: controller.signal }).then((data) => {
+      bathymetryRef.current = data;
       sceneApiRef.current?.setBathymetry(data);
     }).catch(() => {
       // The scene remains usable without the optional cached relief mesh.
@@ -795,14 +858,20 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   }, [dataSource, variable]);
 
   useEffect(() => {
-    if (!containerRef.current || !payload || !range) {
+    if (!containerRef.current || !renderedPayload || !range) {
       return;
+    }
+
+    const extentSignature = `${renderedPayload.longitudes[0]}:${renderedPayload.longitudes.at(-1)}:${renderedPayload.latitudes[0]}:${renderedPayload.latitudes.at(-1)}`;
+    if (sceneApiRef.current && sceneExtentRef.current !== extentSignature) {
+      sceneApiRef.current.dispose();
+      sceneApiRef.current = null;
     }
 
     if (!sceneApiRef.current) {
       sceneApiRef.current = createOceanScene(
         containerRef.current,
-        payload,
+        renderedPayload,
         range,
         scale,
         opacity,
@@ -814,17 +883,29 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         setSelectedInstrumentId,
         setHoveredInstrument,
         setHoveredData,
+        sliceDepth,
         presentation,
         reducedMotion,
       );
       sceneApiRef.current.setInstruments(instrumentsRef.current);
+      if (bathymetryRef.current) sceneApiRef.current.setBathymetry(bathymetryRef.current);
       if (landImageRef.current) sceneApiRef.current.setLandImagery(landImageRef.current);
+      if (currentField) {
+        const bounds = {
+          west: renderedPayload.longitudes[0], east: renderedPayload.longitudes.at(-1),
+          south: renderedPayload.latitudes[0], north: renderedPayload.latitudes.at(-1),
+        };
+        const croppedCurrentField = cropLoadedCurrentField(currentField, bounds);
+        if (croppedCurrentField) sceneApiRef.current.setCurrentField(croppedCurrentField);
+      }
       sceneApiRef.current.highlightDepth(selectedDepthIndex);
       sceneApiRef.current.setFigureMode(figureMode);
+      sceneApiRef.current.setSliceDepth(sliceDepth);
+      sceneExtentRef.current = extentSignature;
     } else {
-      sceneApiRef.current.updateLayers(payload, range, scale);
+      sceneApiRef.current.updateLayers(renderedPayload, range, scale);
     }
-  }, [payload, range, scale, presentation, reducedMotion]);
+  }, [renderedPayload, range, scale, presentation, reducedMotion, currentField]);
 
   useEffect(() => () => {
     sceneApiRef.current?.dispose();
@@ -867,6 +948,10 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
   useEffect(() => {
     sceneApiRef.current?.setIsothermContoursVisible(isothermContoursEnabled);
   }, [isothermContoursEnabled]);
+
+  useEffect(() => {
+    sceneApiRef.current?.setSliceDepth(sliceDepth);
+  }, [sliceDepth]);
 
 
   useEffect(() => {
@@ -960,7 +1045,13 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
     getOceanCurrents({ time: times[selectedTimeIndex], signal: controller.signal })
       .then((field) => {
         setCurrentField(field);
-        sceneApiRef.current?.setCurrentField(field);
+        const visiblePayload = renderedPayloadRef.current;
+        const bounds = visiblePayload ? {
+          west: visiblePayload.longitudes[0], east: visiblePayload.longitudes.at(-1),
+          south: visiblePayload.latitudes[0], north: visiblePayload.latitudes.at(-1),
+        } : null;
+        const croppedField = cropLoadedCurrentField(field, bounds);
+        if (croppedField) sceneApiRef.current?.setCurrentField(croppedField);
         sceneApiRef.current?.setParticlesVisible(true);
         setCurrentStatus("ready");
       })
@@ -1035,7 +1126,14 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
         }
       }}>
         <div className="panel-header"><h2>Visual controls</h2><span className="step-label">01 · Configure</span></div>
-        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} isothermContoursEnabled={isothermContoursEnabled} onIsothermContoursChange={setIsothermContoursEnabled} uploadSelected={dataSource === "upload"} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} viewMode={viewMode} onViewModeChange={setViewMode} figureMode={figureMode} onFigureModeChange={setFigureMode} />}
+        {range && <VisualizationControls variable={variable} onVariableChange={setVariable} minimum={range.minimum} maximum={range.maximum} unit={unit} onRangeChange={handleRangeChange} scale={scale} onScaleChange={handleScaleChange} opacity={opacity} onOpacityChange={setOpacity} verticalExaggeration={verticalExaggeration} onVerticalExaggerationChange={setVerticalExaggeration} isosurfaceEnabled={isosurfaceEnabled} onIsosurfaceEnabledChange={setIsosurfaceEnabled} isosurfaceThreshold={isosurfaceThreshold} onIsosurfaceThresholdChange={setIsosurfaceThreshold} isothermContoursEnabled={isothermContoursEnabled} onIsothermContoursChange={setIsothermContoursEnabled} uploadSelected={dataSource === "upload"} temperatureOnly={temperatureOnly} error={controlsError} backgroundColor={backgroundColor} onBackgroundColorChange={setBackgroundColor} onInfoOpen={setInfoTopic} viewMode={viewMode} onViewModeChange={setViewMode} figureMode={figureMode} onFigureModeChange={setFigureMode} />}
+        {payload && range && <RegionSelector payload={payload} range={range} selection={regionSelection} onChange={(selection) => { setRegionSelection(selection); setWestSliceIndex(null); }} />}
+        {payload && effectiveSelection && <section className="control-section" aria-labelledby="clip-control-title">
+          <div className="control-kicker" id="clip-control-title">Volume clipping</div>
+          <label className="slider-control"><span className="slider-label">Slice from Top <output>{sliceDepth == null ? "Full" : `${sliceDepth.toFixed(0)} m`}</output></span><input aria-label="Slice volume from top" type="range" min="0" max={payload.layers.length} step="1" value={sliceDepth == null ? payload.layers.length : payload.layers.findIndex((layer) => layer.depth === sliceDepth)} onChange={(event) => { const index = Number(event.target.value); setSliceDepth(index === payload.layers.length ? null : payload.layers[index].depth); }} /><span className="range-endpoints"><span>{payload.layers[0].depth.toFixed(0)} m</span><span>Full</span></span></label>
+          <label className="slider-control"><span className="slider-label">Slice from West <output>{payload.longitudes[effectiveSelection.westIndex].toFixed(2)}°E</output></span><input aria-label="Slice volume from west" type="range" min={normalizedSelection?.westIndex ?? 0} max={(normalizedSelection?.eastIndex ?? payload.longitudes.length - 1) - 1} step="1" value={effectiveSelection.westIndex} onChange={(event) => setWestSliceIndex(Number(event.target.value))} /><span className="range-endpoints"><span>{payload.longitudes[normalizedSelection?.westIndex ?? 0].toFixed(1)}°E</span><span>{payload.longitudes[(normalizedSelection?.eastIndex ?? payload.longitudes.length - 1) - 1].toFixed(1)}°E</span></span></label>
+          <p className="status-copy">Both clips snap to loaded model levels/cells and trigger no data request.</p>
+        </section>}
         {payload && selectedTimeIndex !== null && <DepthTimeSlider depths={payload.layers.map((layer) => layer.depth)} selectedDepthIndex={selectedDepthIndex} onDepthChange={setSelectedDepthIndex} times={times} selectedTimeIndex={selectedTimeIndex} onTimeChange={handleTimeChange} isUpdating={isUpdating} onInfoOpen={setInfoTopic} />}
         {payload && <section className="control-section"><div className="control-kicker">Flow overlay <span className="info-tip" title="Animate particles from real Copernicus uo/vo surface vectors." aria-label="Animate particles from real Copernicus uo/vo surface vectors.">i</span></div><label className="toggle-row" title="Animate real eastward and northward current vectors"><span>Surface currents</span><input aria-label="Animate real surface-current vectors" type="checkbox" checked={particlesEnabled} disabled={dataSource === "upload"} onChange={(event) => setParticlesEnabled(event.target.checked)} /><span className="toggle" aria-hidden="true" /></label><p className="status-copy" aria-live="polite">{currentStatus === "loading" && "Loading uo/vo vectors…"}{currentStatus === "ready" && `${CURRENT_PARTICLE_COUNT} particles · ${currentField.time.slice(0, 10)}`}{currentStatus === "error" && "Current vectors unavailable."}{currentStatus === "off" && "Currently off"}</p><div className="hazard-row"><strong>Cyclone tracking</strong><span className="hazard-status">{cycloneStatus === "loading" ? "Checking GDACS…" : cycloneStatus}</span></div><small className="source-note">Source: GDACS public events API</small></section>}
       </aside>
@@ -1045,7 +1143,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
           <div ref={containerRef} className="scene-container" role="img" aria-label={`Interactive ${FIGURE_LABELS[figureMode].toLowerCase()} of real ${VARIABLE_LABELS[variable].toLowerCase()} model data`} />
           {(!payload || isUpdating) && !error && <div className="loading-overlay"><div className="loading-content"><div className="loading-ring" /><strong>{payload ? "Updating the water column" : "Building the ocean volume"}</strong><span>Reading real model layers…</span></div></div>}
           {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
-          {payload && <div className="region-caption" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><strong>Model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
+          {renderedPayload && <div className="region-caption" aria-label={`Visible region ${renderedPayload.latitudes[0].toFixed(1)} to ${renderedPayload.latitudes.at(-1).toFixed(1)} north and ${renderedPayload.longitudes[0].toFixed(1)} to ${renderedPayload.longitudes.at(-1).toFixed(1)} east`}><strong>{regionSelection || westSliceIndex != null ? "Selected extent" : "Model extent"}</strong><span>{renderedPayload.longitudes[0].toFixed(2)}–{renderedPayload.longitudes.at(-1).toFixed(2)}°E · {renderedPayload.latitudes[0].toFixed(2)}–{renderedPayload.latitudes.at(-1).toFixed(2)}°N</span></div>}
             <div className="guided-hint">{figureMode === "volume" ? "Click a marker to compare its observed profile with the model. " : ""}Left drag rotates; middle drag pans; scroll zooms. Close zoom uses interpolated rendering; source resolution remains ~9 km.</div>
           {figureMode === "volume" && <div className="bathymetry-caption">Land imagery: NASA GIBS · Seafloor: GEBCO 2026 bathymetry</div>}
           {hoveredData && <div role="status" className="scene-data-tooltip"><div className="scene-data-tooltip-title"><span className="value-swatch" style={{ background: hoveredData.color }} />{VARIABLE_LABELS[hoveredData.variable] || hoveredData.variable}</div><strong>{hoveredData.value.toFixed(3)} {hoveredData.unit}</strong><div>Depth {hoveredData.depth.toFixed(0)} m</div><div>{hoveredData.latitude.toFixed(2)}°N · {hoveredData.longitude.toFixed(2)}°E</div></div>}

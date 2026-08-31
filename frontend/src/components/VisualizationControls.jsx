@@ -18,7 +18,7 @@ function VisualizationControls({
   isosurfaceThreshold, onIsosurfaceThresholdChange, uploadSelected, error,
   isothermContoursEnabled, onIsothermContoursChange,
   backgroundColor, onBackgroundColorChange, onInfoOpen,
-  viewMode, onViewModeChange, figureMode, onFigureModeChange,
+  viewMode, onViewModeChange, figureMode, onFigureModeChange, temperatureOnly = false,
 }) {
   return (
     <>
@@ -26,12 +26,13 @@ function VisualizationControls({
         <div className="control-kicker" id="variable-control-title">Variable <InfoButton topic="variable" onOpen={onInfoOpen} /></div>
         <div className="variable-buttons">
           {VARIABLES.map(([value, label, variableUnit, icon]) => (
-            <button className={`variable-button ${variable === value ? "active" : ""}`} type="button" key={value} disabled={uploadSelected && value !== "thetao"} onClick={() => onVariableChange(value)} title={`Render ${label.toLowerCase()} (${variableUnit})`} aria-pressed={variable === value}>
+              <button className={`variable-button ${variable === value ? "active" : ""}`} type="button" key={value} disabled={(uploadSelected || temperatureOnly) && value !== "thetao"} onClick={() => onVariableChange(value)} title={`Render ${label.toLowerCase()} (${variableUnit})`} aria-pressed={variable === value}>
               <span className="variable-icon" aria-hidden="true">{icon}</span><span>{label}<small>{variableUnit}</small></span>
             </button>
           ))}
         </div>
         {uploadSelected && <p className="status-copy">Uploads provide temperature only; other fields use Copernicus Marine.</p>}
+        {temperatureOnly && <p className="status-copy">This dedicated figure is fixed to Copernicus temperature.</p>}
       </section>
 
       <section className="control-section" aria-labelledby="view-control-title">

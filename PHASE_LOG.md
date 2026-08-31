@@ -1,5 +1,13 @@
 # Phase Log
 
+## Region Drag-select and West-axis Slicing
+
+- **Status:** Complete.
+- **Implementation:** Added a minimap for the active surface field to the existing Explorer controls. Dragging a box selects native row/column bounds inside the already loaded model extent and rebuilds the 3D layers from an in-memory array crop; no API request or new data loading occurs. The selected bounds also constrain visible observation markers, cached GEBCO relief, NASA land-image sampling, and already-loaded current vectors. Added `Slice from Top` and `Slice from West` controls snapped respectively to loaded depth levels and longitude columns. Added a focused `/temperature-volume` route that reuses this same renderer in temperature-only mode without adding or restoring any API.
+- **Scientific scope:** Cropping and clipping reveal subsets of existing model cells; they do not resample the source or imply a finer model resolution. Reset restores the full loaded extent.
+- **Files changed:** `frontend/src/pages/TemperatureVolumeExplorerPage.jsx`, `frontend/src/components/RegionSelector.jsx`, `frontend/src/utils/regionSelection.js`, `frontend/src/components/OceanScene3D.jsx`, `frontend/src/App.jsx`, `frontend/src/styles.css`, `PHASE_LOG.md`.
+- **Manual verification:** Start the backend and frontend and open `/temperature-volume` (then repeat on `/explorer`). Drag a box on **Region drag-select** and confirm the 3D block changes to exactly the displayed longitude/latitude bounds without a loading overlay or network request to `/api/layers`; click **Reset** to restore 68–90°E, 5–22°N. Move **Slice from West** and confirm the western edge advances by real model longitude columns. Move **Slice from Top** and confirm only layers from the surface through the selected real depth remain visible, then select **Full**. Verify markers outside a crop disappear, GEBCO/land imagery remain geographically aligned, and temperature hover coordinates remain inside the selected bounds.
+
 ## Smooth Interpolated Zoom for 3D Volume
 
 - **Status:** Complete.
