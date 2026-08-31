@@ -1,5 +1,13 @@
 # Phase Log
 
+## Smooth Interpolated Zoom for 3D Volume
+
+- **Status:** Complete.
+- **Implementation:** Upsampled each rendered horizontal depth texture at 3× using bicubic interpolation between finite neighboring Copernicus cells, with bilinear fallback at ocean edges. The native nearest-cell ocean mask is retained so interpolation cannot paint model values onto land. Texture filtering remains smooth under close camera zoom, while hover coordinates and values continue to report native loaded grid cells.
+- **Scientific scope:** This is rendering interpolation only. It adds no observations, changes no API or loading path, and does not claim resolution finer than the source grid (approximately 9 km). The scene explicitly states this limitation.
+- **Files changed:** `frontend/src/utils/colorScale.js`, `frontend/src/components/OceanScene3D.jsx`, `PHASE_LOG.md`.
+- **Manual verification:** Start the backend and frontend, open `/explorer`, select **Layered ocean volume**, and zoom close to a temperature layer. Confirm color transitions are smooth rather than blocky, coastlines retain the existing land mask/imagery, and the guided note says the source remains approximately 9 km. Change date, variable, color range, scale, and highlighted depth and confirm each texture updates normally; hover and confirm values still snap to native model coordinates.
+
 ## Fix - Instrument markers floating above the surface
 
 - **Status:** Complete.

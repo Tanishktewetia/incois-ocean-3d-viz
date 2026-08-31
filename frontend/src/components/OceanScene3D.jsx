@@ -6,7 +6,7 @@ import InstrumentOverlay from "./InstrumentOverlay.jsx";
 import DepthTimeSlider from "./DepthTimeSlider.jsx";
 import VisualizationControls from "./VisualizationControls.jsx";
 import { ControlInfoModal, InfoButton } from "./ControlInfoModal.jsx";
-import { createColorBuffer, getFiniteRange, interpolateColor } from "../utils/colorScale.js";
+import { createSmoothColorBuffer, getFiniteRange, interpolateColor } from "../utils/colorScale.js";
 import {
   createCurrentParticles,
   CURRENT_PARTICLE_COUNT,
@@ -126,32 +126,35 @@ function createOceanScene(
   scene.add(instrumentMarkers);
 
   function createLayerPixels(layer, nextRange, nextScale) {
-    const pixels = createColorBuffer(layer.values, nextRange.minimum, nextRange.maximum, { scale: nextScale });
-    if (!landImageData) return pixels;
-    const sourceHeight = layer.values.length;
-    const sourceWidth = layer.values[0]?.length || 0;
-    for (let row = 0; row < sourceHeight; row += 1) {
-      for (let column = 0; column < sourceWidth; column += 1) {
-        const pixelIndex = (row * sourceWidth + column) * 4;
-        if (pixels[pixelIndex + 3] !== 0) continue;
-        const imageColumn = Math.round((column / Math.max(1, sourceWidth - 1)) * (landImageData.width - 1));
-        const imageRow = Math.round((1 - row / Math.max(1, sourceHeight - 1)) * (landImageData.height - 1));
+    const result = createSmoothColorBuffer(
+      layer.values,
+      nextRange.minimum,
+      nextRange.maximum,
+      { scale: nextScale },
+    );
+    if (!landImageData) return result;
+    for (let row = 0; row < result.height; row += 1) {
+      for (let column = 0; column < result.width; column += 1) {
+        const pixelIndex = (row * result.width + column) * 4;
+        if (result.pixels[pixelIndex + 3] !== 0) continue;
+        const imageColumn = Math.round((column / Math.max(1, result.width - 1)) * (landImageData.width - 1));
+        const imageRow = Math.round((1 - row / Math.max(1, result.height - 1)) * (landImageData.height - 1));
         const imageIndex = (imageRow * landImageData.width + imageColumn) * 4;
-        pixels[pixelIndex] = landImageData.data[imageIndex];
-        pixels[pixelIndex + 1] = landImageData.data[imageIndex + 1];
-        pixels[pixelIndex + 2] = landImageData.data[imageIndex + 2];
-        pixels[pixelIndex + 3] = 255;
+        result.pixels[pixelIndex] = landImageData.data[imageIndex];
+        result.pixels[pixelIndex + 1] = landImageData.data[imageIndex + 1];
+        result.pixels[pixelIndex + 2] = landImageData.data[imageIndex + 2];
+        result.pixels[pixelIndex + 3] = 255;
       }
     }
-    return pixels;
+    return result;
   }
 
   payload.layers.forEach((layer) => {
-    const pixels = createLayerPixels(layer, range, scale);
+    const textureData = createLayerPixels(layer, range, scale);
     const texture = new THREE.DataTexture(
-      pixels,
-      payload.longitudes.length,
-      payload.latitudes.length,
+      textureData.pixels,
+      textureData.width,
+      textureData.height,
       THREE.RGBAFormat,
     );
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -510,7 +513,7 @@ function createOceanScene(
         data: imageContext.getImageData(0, 0, imageCanvas.width, imageCanvas.height).data,
       };
       scenePayload.layers.forEach((layer, index) => {
-        textures[index].image.data.set(createLayerPixels(layer, sceneRange, sceneScale));
+        textures[index].image.data.set(createLayerPixels(layer, sceneRange, sceneScale).pixels);
         textures[index].needsUpdate = true;
       });
     },
@@ -579,8 +582,8 @@ function createOceanScene(
       sceneRange = nextRange;
       sceneScale = nextScale;
       nextPayload.layers.forEach((layer, index) => {
-        const pixels = createLayerPixels(layer, nextRange, nextScale);
-        textures[index].image.data.set(pixels);
+        const textureData = createLayerPixels(layer, nextRange, nextScale);
+        textures[index].image.data.set(textureData.pixels);
         textures[index].needsUpdate = true;
       });
       isosurface.updateVolume(nextPayload, nextRange);
@@ -1043,7 +1046,7 @@ function OceanScene3D({ dataSource, initialVariable = "thetao", uploadedInstrume
           {(!payload || isUpdating) && !error && <div className="loading-overlay"><div className="loading-content"><div className="loading-ring" /><strong>{payload ? "Updating the water column" : "Building the ocean volume"}</strong><span>Reading real model layers…</span></div></div>}
           {error && <div className="loading-overlay"><div className="loading-content"><strong role="alert">Data unavailable</strong><span>{error}</span></div></div>}
           {payload && <div className="region-caption" aria-label={`Loaded region ${payload.latitudes[0].toFixed(1)} to ${payload.latitudes.at(-1).toFixed(1)} north and ${payload.longitudes[0].toFixed(1)} to ${payload.longitudes.at(-1).toFixed(1)} east`}><strong>Model extent</strong><span>{payload.longitudes[0].toFixed(0)}–{payload.longitudes.at(-1).toFixed(0)}°E · {payload.latitudes[0].toFixed(0)}–{payload.latitudes.at(-1).toFixed(0)}°N</span></div>}
-          <div className="guided-hint">{figureMode === "volume" ? "Click a marker to compare its observed profile with the model. " : ""}Left drag rotates; middle drag pans; scroll zooms.</div>
+            <div className="guided-hint">{figureMode === "volume" ? "Click a marker to compare its observed profile with the model. " : ""}Left drag rotates; middle drag pans; scroll zooms. Close zoom uses interpolated rendering; source resolution remains ~9 km.</div>
           {figureMode === "volume" && <div className="bathymetry-caption">Land imagery: NASA GIBS · Seafloor: GEBCO 2026 bathymetry</div>}
           {hoveredData && <div role="status" className="scene-data-tooltip"><div className="scene-data-tooltip-title"><span className="value-swatch" style={{ background: hoveredData.color }} />{VARIABLE_LABELS[hoveredData.variable] || hoveredData.variable}</div><strong>{hoveredData.value.toFixed(3)} {hoveredData.unit}</strong><div>Depth {hoveredData.depth.toFixed(0)} m</div><div>{hoveredData.latitude.toFixed(2)}°N · {hoveredData.longitude.toFixed(2)}°E</div></div>}
           {hoveredInstrument && <div role="tooltip" className="scene-tooltip" style={{ borderColor: hoveredInstrument.data_status === "sample" ? "#d47cff" : undefined }}><strong>{hoveredInstrument.instrument_label} {hoveredInstrument.platform_number}</strong>{hoveredInstrument.data_status === "sample" && <div>SAMPLE DATA — not live</div>}<div>{hoveredInstrument.variables.join(", ")}</div></div>}
