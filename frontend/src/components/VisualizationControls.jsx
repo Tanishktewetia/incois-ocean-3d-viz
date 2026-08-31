@@ -9,6 +9,7 @@ const VIEW_MODES = [["composite", "Composite"], ["bathymetry", "Bathymetry only"
 const FIGURE_MODES = [
   ["volume", "Layered ocean volume", "Depth layers, seafloor, observations, and optional flows"],
   ["relief", "Field relief surface", "Selected depth shown as an interactive value-height surface"],
+  ["solid", "Temperature solid volume", "Dense continuous 3D volume with real field-derived isosurfaces"],
 ];
 
 function VisualizationControls({
@@ -42,7 +43,7 @@ function VisualizationControls({
               <button className={`figure-button ${figureMode === value ? "active" : ""}`} type="button" onClick={() => onFigureModeChange(value)} aria-pressed={figureMode === value}>
                 <span aria-hidden="true">0{index + 1}</span><strong>{label}</strong><small>{description}</small>
               </button>
-              <InfoButton topic={value === "volume" ? "figureVolume" : "figureRelief"} onOpen={onInfoOpen} />
+              <InfoButton topic={value === "volume" ? "figureVolume" : value === "relief" ? "figureRelief" : "figureSolid"} onOpen={onInfoOpen} />
             </div>
           ))}
         </div>
