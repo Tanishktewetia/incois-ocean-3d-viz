@@ -40,8 +40,8 @@ SAMPLE_INSTRUMENTS: tuple[dict[str, Any], ...] = (
         "platform_number": "SAMPLE-GLIDER-01",
         "cycle_number": None,
         "time": "2026-08-20T06:00:00Z",
-        "latitude": 12.4,
-        "longitude": 74.8,
+        "latitude": 15.0,
+        "longitude": 72.5,
         "variables": ["temperature"],
         "profile": {
             "series": [
@@ -66,8 +66,8 @@ SAMPLE_INSTRUMENTS: tuple[dict[str, Any], ...] = (
         "platform_number": "SAMPLE-CTD-01",
         "cycle_number": None,
         "time": "2026-08-22T09:30:00Z",
-        "latitude": 9.6,
-        "longitude": 78.4,
+        "latitude": 15.0,
+        "longitude": 82.5,
         "variables": ["temperature"],
         "profile": {
             "series": [

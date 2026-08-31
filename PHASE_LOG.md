@@ -1,5 +1,13 @@
 # Phase Log
 
+## Fix - Sample Glider/CTD Ocean Placement
+
+- **Status:** Complete.
+- **Implementation:** Moved only the labelled sample Glider and CTD coordinates to open-ocean cells within the existing India EEZ visualization region. The Glider is now at `15.0°N, 72.5°E` in the Arabian Sea, and the CTD is now at `15.0°N, 82.5°E` in the Bay of Bengal. Both locations are finite ocean cells in the same Copernicus surface mask used to distinguish ocean from land in the 2D and 3D renderers, have fully ocean-valid surrounding 9×9 model-cell neighborhoods, and are also below sea level in the existing GEBCO grid. All sample-data labels and profile values remain unchanged.
+- **Files changed:** `backend/services/instruments.py`, `PHASE_LOG.md`.
+- **Manual verification:** Start the backend and frontend, open `/explorer`, and locate the purple triangle and square in both the 3D scene and 2D map. Confirm the Glider appears clearly offshore in the Arabian Sea and the CTD clearly offshore in the Bay of Bengal. Click each marker and confirm the profile still displays `SAMPLE DATA — for demonstration only; this is not a live observation.`
+- **Automated validation:** The backend instrument tests, Python byte-compilation, coordinate checks against the Copernicus finite-cell mask and GEBCO bathymetry, and `git diff --check` pass.
+
 
 ## Isotherm Contour Toggle
 
