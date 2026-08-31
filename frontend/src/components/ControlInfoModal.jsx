@@ -25,13 +25,6 @@ export const CONTROL_INFO = {
     how: "Select a depth, rotate or zoom the surface, and change the variable, date, color range, or scale to examine a different field. Hover the surface to read the underlying value and geographic position.",
     detail: "This is a visualization transform of real model values, not terrain or invented bathymetry. Missing cells remain holes so the surface does not imply data where none was provided.",
   },
-  figureSolid: {
-    label: "FIGURE GUIDE",
-    title: "Temperature solid volume",
-    what: "A continuous 3D body generated from the loaded temperature field with dense trilinear sampling and nested temperature isosurfaces.",
-    how: "Select it under 3D figure, then rotate and zoom the volume. Change variable, date, color range, opacity, and vertical exaggeration to inspect the real loaded field.",
-    detail: "The body is a 3D scalar-field view, not stacked images. Nested surfaces mark progressively higher temperature bands; use the legend and hover values for exact readings.",
-  },
   isotherm: {
     title: "Isotherm contours",
     what: "Thin lines marking equal temperature values across the loaded temperature field. Each line is an isotherm, and the fixed interval is 2 °C.",
