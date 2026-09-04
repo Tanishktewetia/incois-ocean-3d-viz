@@ -5,11 +5,14 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
+from backend.services.storage import ensure_storage_file
+
 BATHYMETRY_FILE = Path(__file__).resolve().parents[1] / "data" / "gebco_2026_india_eez.nc"
 
 
 @lru_cache(maxsize=1)
 def get_bathymetry() -> dict[str, Any]:
+    ensure_storage_file(BATHYMETRY_FILE)
     if not BATHYMETRY_FILE.is_file():
         raise RuntimeError("GEBCO regional bathymetry subset is not available.")
     try:

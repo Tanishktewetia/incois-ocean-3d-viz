@@ -6,6 +6,8 @@ from typing import Any
 import numpy as np
 import xarray as xr
 
+from backend.services.storage import ensure_storage_file
+
 DATA_FILE = (
     Path(__file__).resolve().parents[1]
     / "data"
@@ -54,6 +56,7 @@ class OceanDataUnavailableError(RuntimeError):
 @lru_cache(maxsize=1)
 def get_dataset() -> xr.Dataset:
     """Open the local Copernicus subset once and reuse it across requests."""
+    ensure_storage_file(DATA_FILE)
     if not DATA_FILE.is_file():
         raise OceanDataUnavailableError(
             f"Copernicus subset not found at {DATA_FILE}."
@@ -70,6 +73,7 @@ def get_dataset() -> xr.Dataset:
 @lru_cache(maxsize=1)
 def get_salinity_dataset() -> xr.Dataset:
     """Open the matching Copernicus salinity subset once."""
+    ensure_storage_file(SALINITY_DATA_FILE)
     if not SALINITY_DATA_FILE.is_file():
         raise OceanDataUnavailableError(
             f"Copernicus salinity subset not found at {SALINITY_DATA_FILE}."
@@ -85,6 +89,7 @@ def get_salinity_dataset() -> xr.Dataset:
 @lru_cache(maxsize=1)
 def get_currents_3d_dataset() -> xr.Dataset:
     """Open the full-depth Copernicus current subset once."""
+    ensure_storage_file(CURRENTS_3D_DATA_FILE)
     if not CURRENTS_3D_DATA_FILE.is_file():
         raise OceanDataUnavailableError(
             f"Copernicus 3D current subset not found at {CURRENTS_3D_DATA_FILE}."
@@ -278,6 +283,7 @@ def save_upload_stream(file_object: Any, dataset_type: str = "thetao") -> dict[s
 @lru_cache(maxsize=1)
 def get_currents_dataset() -> xr.Dataset:
     """Open the matching Copernicus surface-current subset once."""
+    ensure_storage_file(CURRENTS_DATA_FILE)
     if not CURRENTS_DATA_FILE.is_file():
         raise OceanDataUnavailableError(
             f"Copernicus current subset not found at {CURRENTS_DATA_FILE}."

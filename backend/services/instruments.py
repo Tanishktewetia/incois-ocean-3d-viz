@@ -18,6 +18,7 @@ from backend.services.argo import (
     request_argo_profile,
     request_argo_profiles,
 )
+from backend.services.storage import ensure_storage_directory
 
 BGC_ARGO_DIRECTORY = (
     Path(__file__).resolve().parents[1] / "data" / "bgc_argo_20260818_20260824"
@@ -256,6 +257,7 @@ def _read_bgc_profile(path: Path, include_series: bool) -> dict[str, Any] | None
 
 @lru_cache(maxsize=1)
 def _bgc_catalog() -> tuple[dict[str, Any], ...]:
+    ensure_storage_directory(BGC_ARGO_DIRECTORY)
     if not BGC_ARGO_DIRECTORY.is_dir():
         raise InstrumentDataUnavailableError(
             f"BGC-Argo GDAC subset not found at {BGC_ARGO_DIRECTORY}."

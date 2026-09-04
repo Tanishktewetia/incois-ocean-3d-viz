@@ -6,6 +6,7 @@ import numpy as np
 import xarray as xr
 
 from backend.services.comparison import compare_model_to_profile
+from backend.services.storage import ensure_storage_directory
 
 ARGO_DIRECTORY = (
     Path(__file__).resolve().parents[1] / "data" / "argo_20260818_20260824"
@@ -127,6 +128,7 @@ def _read_profile(path: Path, include_measurements: bool) -> dict[str, Any] | No
 
 @lru_cache(maxsize=1)
 def _catalog() -> tuple[dict[str, Any], ...]:
+    ensure_storage_directory(ARGO_DIRECTORY)
     if not ARGO_DIRECTORY.is_dir():
         raise ArgoDataUnavailableError(
             f"Argo GDAC subset not found at {ARGO_DIRECTORY}."
