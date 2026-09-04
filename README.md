@@ -97,8 +97,8 @@ This repository includes [`vercel.json`](vercel.json), [`api/index.py`](api/inde
 
 1. Import the GitHub repository into Vercel.
 2. Keep the project root at the repository root. Do not set `frontend` as the Vercel root directory.
-3. Add `VITE_API_BASE_URL` if the data-backed FastAPI API is hosted separately. Leave it empty only when the Vercel function can access the required datasets.
-4. Deploy. Vercel runs `npm ci --prefix frontend && npm run build --prefix frontend` and serves `frontend/dist`.
+3. Deploy. Vercel builds and serves the static React frontend from `public/`.
+4. Set `VITE_API_BASE_URL` to the public HTTPS URL of a separately hosted FastAPI backend so the data and upload features can connect.
 
 For a separately hosted API, set its `FRONTEND_ORIGINS` environment variable to the Vercel URL (for example, `https://your-project.vercel.app`). Multiple origins can be comma-separated.
 
