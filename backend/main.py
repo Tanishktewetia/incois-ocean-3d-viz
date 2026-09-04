@@ -1,5 +1,6 @@
 import os
 
+import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -39,7 +40,21 @@ app.include_router(hazards_router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not supabase_url or not service_role_key:
+        return {"status": "ok", "supabase": "not_configured"}
+
+    try:
+        response = requests.get(
+            f"{supabase_url}/rest/v1/datasets?select=id&limit=1",
+            headers={"apikey": service_role_key, "Authorization": f"Bearer {service_role_key}"},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return {"status": "ok", "supabase": "unavailable"}
+    return {"status": "ok", "supabase": "ok"}
 
 
 @app.get("/api/health")

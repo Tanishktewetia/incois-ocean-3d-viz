@@ -102,6 +102,8 @@ This repository includes [`vercel.json`](vercel.json), [`api/index.py`](api/inde
 
 For a separately hosted API, set its `FRONTEND_ORIGINS` environment variable to the Vercel URL (for example, `https://your-project.vercel.app`). Multiple origins can be comma-separated.
 
+The Render backend should also receive `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as environment variables. Keep the service-role key private and never commit it. The `/health` response reports whether the configured Supabase REST endpoint is reachable.
+
 ### Important serverless limitation
 
 The Vercel function is a deployment adapter, not a data warehouse. The repository ignores the large NetCDF cache and upload storage, and serverless filesystems are ephemeral. For a production data deployment, host the FastAPI service with persistent data storage, set `VITE_API_BASE_URL` to its public HTTPS URL, and enable CORS for the Vercel domain. The frontend remains fully Vercel-hosted.
