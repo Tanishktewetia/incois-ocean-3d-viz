@@ -5,7 +5,7 @@ function apiUrl(path) {
 }
 
 export async function getHealth() {
-  const response = await fetch(apiUrl("/health"));
+  const response = await fetch(apiUrl("/api/health"));
 
   if (!response.ok) {
     throw new Error(`Health check failed with status ${response.status}`);

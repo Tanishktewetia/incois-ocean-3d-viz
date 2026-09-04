@@ -8,6 +8,7 @@
 - **Files changed:** `api/index.py`, `requirements.txt`, `vercel.json`, `.env.example`, `frontend/src/api/client.js`, `frontend/vite.config.js`, `backend/main.py`, `README.md`, `PHASE_LOG.md`.
 - **Deployment note:** The Vercel function exposes the API contract, but the ignored scientific cache still needs to be available to the backend. For production data, use a persistent FastAPI host and set `VITE_API_BASE_URL` in Vercel.
 - **Follow-up fix:** Replaced the root `requirements.txt` pip include with concrete dependency lines because Vercel's build parser rejects `-r` includes.
+- **Invocation crash fix:** Removed collapsing `/api` and `/health` rewrites. Vercel now uses native `api/index.py` routing for backend paths, and the frontend checks the explicit `/api/health` alias.
 - **Automated validation:** Frontend production build, Vercel entrypoint import, backend tests, Python compilation, and `git diff --check` pass.
 
 ## Region Drag-select and West-axis Slicing

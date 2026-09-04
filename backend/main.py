@@ -40,3 +40,8 @@ app.include_router(hazards_router)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/health")
+def api_health() -> dict[str, str]:
+    return health()

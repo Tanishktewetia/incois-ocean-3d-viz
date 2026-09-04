@@ -89,7 +89,7 @@ backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload
 npm run dev --prefix frontend
 ```
 
-Open <http://localhost:5173>. Vite proxies `/health`, `/api`, `/wms`, and `/wcs` to the local API at port 8000.
+Open <http://localhost:5173>. Vite proxies `/api`, `/wms`, and `/wcs` to the local API at port 8000.
 
 ## Deploy to Vercel
 
