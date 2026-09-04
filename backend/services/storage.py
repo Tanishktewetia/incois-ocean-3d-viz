@@ -39,6 +39,14 @@ def _s3_client(bucket: str, region: str) -> Any:
     return boto3.client("s3", region_name=region)
 
 
+def _download_s3_object(client: Any, bucket: str, object_key: str, path: Path) -> bool:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(path.suffix + ".part")
+    client.download_file(bucket, object_key, str(temporary_path))
+    temporary_path.replace(path)
+    return True
+
+
 def _ensure_s3_file(path: Path) -> bool:
     configuration = _s3_configuration()
     if configuration is None or path.is_file():
@@ -48,19 +56,15 @@ def _ensure_s3_file(path: Path) -> bool:
     relative_path = path.relative_to(data_root).as_posix()
     client = _s3_client(bucket, region)
     try:
-        object_key = next(
-            (key for candidate in _object_candidates(relative_path)
-             for key in (candidate,)
-             if client.list_objects_v2(Bucket=bucket, Prefix=key, MaxKeys=1).get("Contents")),
-            None,
-        )
+        object_key = None
+        for candidate in _object_candidates(relative_path):
+            contents = client.list_objects_v2(Bucket=bucket, Prefix=candidate, MaxKeys=10).get("Contents", [])
+            if any(item.get("Key") == candidate for item in contents):
+                object_key = candidate
+                break
         if object_key is None:
             return False
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temporary_path = path.with_suffix(path.suffix + ".part")
-        client.download_file(bucket, object_key, str(temporary_path))
-        temporary_path.replace(path)
-        return True
+        return _download_s3_object(client, bucket, object_key, path)
     except (OSError, ValueError):
         path.with_suffix(path.suffix + ".part").unlink(missing_ok=True)
         return False
@@ -132,15 +136,16 @@ def ensure_storage_directory(directory: Path) -> int:
     if s3_configuration is not None:
         bucket, region = s3_configuration
         data_root = Path(__file__).resolve().parents[1] / "data"
-        relative_directory = directory.relative_to(data_root).as_posix().rstrip("/") + "/"
+        relative_directory = directory.relative_to(data_root).as_posix().rstrip("/")
         try:
             client = _s3_client(bucket, region)
-            response = client.list_objects_v2(Bucket=bucket, Prefix=relative_directory)
             downloaded = 0
-            for item in response.get("Contents", []):
-                key = item.get("Key", "")
-                if key.endswith(".nc") and ensure_storage_file(directory / Path(key).name):
-                    downloaded += 1
+            for prefix in (f"{relative_directory}/", f"data/{relative_directory}/"):
+                response = client.list_objects_v2(Bucket=bucket, Prefix=prefix)
+                for item in response.get("Contents", []):
+                    key = item.get("Key", "")
+                    if key.endswith(".nc") and _download_s3_object(client, bucket, key, directory / Path(key).name):
+                        downloaded += 1
             if downloaded:
                 return downloaded
         except Exception:
