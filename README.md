@@ -63,7 +63,7 @@ The frontend is a Vite application in [`frontend/`](frontend/). The FastAPI appl
 - **Land imagery:** NASA GIBS `MODIS_Terra_CorrectedReflectance_TrueColor`.
 - **Cyclones:** GDACS public event API.
 
-The cached NetCDF and Argo files are intentionally excluded from Git because of their size. A deployment needs access to the required files under `backend/data/`, or a separately hosted data-backed API configured through `VITE_API_BASE_URL`.
+The cached NetCDF and Argo files are intentionally excluded from Git because of their size. A deployment needs access to the required files under `backend/data/`, or a separately hosted data-backed API configured through `VITE_RENDER_API_URL`.
 
 ## Run locally
 
@@ -98,7 +98,7 @@ This repository includes [`vercel.json`](vercel.json), [`api/index.py`](api/inde
 1. Import the GitHub repository into Vercel.
 2. Keep the project root at the repository root. Do not set `frontend` as the Vercel root directory.
 3. Deploy. Vercel builds and serves the static React frontend from `public/`.
-4. Set `VITE_API_BASE_URL` to the public HTTPS URL of a separately hosted FastAPI backend so the data and upload features can connect.
+4. Set `VITE_RENDER_API_URL` to the public HTTPS URL of a separately hosted FastAPI backend so the data and upload features can connect.
 
 For a separately hosted API, set its `FRONTEND_ORIGINS` environment variable to the Vercel URL (for example, `https://your-project.vercel.app`). Multiple origins can be comma-separated.
 
@@ -106,7 +106,7 @@ The Render backend should also receive `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE
 
 ### Important serverless limitation
 
-The Vercel function is a deployment adapter, not a data warehouse. The repository ignores the large NetCDF cache and upload storage, and serverless filesystems are ephemeral. For a production data deployment, host the FastAPI service with persistent data storage, set `VITE_API_BASE_URL` to its public HTTPS URL, and enable CORS for the Vercel domain. The frontend remains fully Vercel-hosted.
+The Vercel function is a deployment adapter, not a data warehouse. The repository ignores the large NetCDF cache and upload storage, and serverless filesystems are ephemeral. For a production data deployment, host the FastAPI service with persistent data storage, set `VITE_RENDER_API_URL` to its public HTTPS URL, and enable CORS for the Vercel domain. The frontend remains fully Vercel-hosted.
 
 The upload workflow is best suited to local development or a backend with persistent storage. Never commit Copernicus credentials or `.env` files.
 
