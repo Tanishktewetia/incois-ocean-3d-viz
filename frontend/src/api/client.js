@@ -1,5 +1,11 @@
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
+function apiUrl(path) {
+  return `${API_BASE_URL}${path}`;
+}
+
 export async function getHealth() {
-  const response = await fetch("/health");
+  const response = await fetch(apiUrl("/health"));
 
   if (!response.ok) {
     throw new Error(`Health check failed with status ${response.status}`);
@@ -9,7 +15,7 @@ export async function getHealth() {
 }
 
 export async function getBathymetry({ signal } = {}) {
-  const response = await fetch("/api/bathymetry", { signal });
+  const response = await fetch(apiUrl("/api/bathymetry"), { signal });
   if (!response.ok) throw new Error("GEBCO bathymetry is unavailable.");
   return response.json();
 }
@@ -27,7 +33,7 @@ export async function uploadOceanDataset(file, datasetType = "thetao", { signal 
   const formData = new FormData();
   formData.append("file", file);
   formData.append("dataset_type", datasetType);
-  const response = await fetch("/api/upload", {
+  const response = await fetch(apiUrl("/api/upload"), {
     method: "POST",
     body: formData,
     signal,
@@ -41,13 +47,13 @@ export async function uploadOceanDataset(file, datasetType = "thetao", { signal 
 export async function uploadInstrumentDataset(file, { signal } = {}) {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await fetch("/api/instruments/upload", { method: "POST", body: formData, signal });
+  const response = await fetch(apiUrl("/api/instruments/upload"), { method: "POST", body: formData, signal });
   if (!response.ok) throw await responseError(response, `Instrument upload failed with status ${response.status}`);
   return response.json();
 }
 
 export async function getCyclones({ signal } = {}) {
-  const response = await fetch("/api/hazards/cyclones", { signal });
+  const response = await fetch(apiUrl("/api/hazards/cyclones"), { signal });
   if (!response.ok) throw await responseError(response, "GDACS cyclone data is unavailable.");
   return response.json();
 }
@@ -63,7 +69,7 @@ export async function getOceanSlice({
     variable,
     source,
   });
-  const response = await fetch(`/api/slice?${parameters}`, { signal });
+  const response = await fetch(apiUrl(`/api/slice?${parameters}`), { signal });
 
   if (!response.ok) {
     throw new Error(`Ocean slice request failed with status ${response.status}`);
@@ -82,7 +88,7 @@ export async function getOceanLayers({
   if (time) {
     parameters.set("time", time);
   }
-  const response = await fetch(`/api/layers?${parameters}`, { signal });
+  const response = await fetch(apiUrl(`/api/layers?${parameters}`), { signal });
 
   if (!response.ok) {
     throw new Error(`Ocean layers request failed with status ${response.status}`);
@@ -96,7 +102,7 @@ export async function getOceanCurrents({ time, signal } = {}) {
   if (time) {
     parameters.set("time", time);
   }
-  const response = await fetch(`/api/currents?${parameters}`, { signal });
+  const response = await fetch(apiUrl(`/api/currents?${parameters}`), { signal });
   if (!response.ok) {
     throw new Error(`Ocean currents request failed with status ${response.status}`);
   }
@@ -104,7 +110,7 @@ export async function getOceanCurrents({ time, signal } = {}) {
 }
 
 export async function getArgoProfiles({ signal } = {}) {
-  const response = await fetch("/api/argo", { signal });
+  const response = await fetch(apiUrl("/api/argo"), { signal });
   if (!response.ok) {
     throw new Error(`Argo profiles request failed with status ${response.status}`);
   }
@@ -112,7 +118,7 @@ export async function getArgoProfiles({ signal } = {}) {
 }
 
 export async function getArgoProfile(profileId, { signal } = {}) {
-  const response = await fetch(`/api/argo/${encodeURIComponent(profileId)}/profile`, {
+  const response = await fetch(apiUrl(`/api/argo/${encodeURIComponent(profileId)}/profile`), {
     signal,
   });
   if (!response.ok) {
@@ -122,7 +128,7 @@ export async function getArgoProfile(profileId, { signal } = {}) {
 }
 
 export async function getInstruments({ signal } = {}) {
-  const response = await fetch("/api/instruments", { signal });
+  const response = await fetch(apiUrl("/api/instruments"), { signal });
   if (!response.ok) {
     throw new Error(`Instrument catalog request failed with status ${response.status}`);
   }
@@ -131,7 +137,7 @@ export async function getInstruments({ signal } = {}) {
 
 export async function getInstrumentProfile(instrumentId, { signal } = {}) {
   const response = await fetch(
-    `/api/instruments/${encodeURIComponent(instrumentId)}/profile`,
+    apiUrl(`/api/instruments/${encodeURIComponent(instrumentId)}/profile`),
     { signal },
   );
   if (!response.ok) {

@@ -1,5 +1,14 @@
 # Phase Log
 
+## Vercel Deployment Readiness
+
+- **Status:** Complete.
+- **Implementation:** Added a root Vercel configuration that builds `frontend/`, serves its SPA routes, and routes API requests to the FastAPI ASGI adapter at `api/index.py`. Added a root Python requirements manifest for Vercel dependency detection. Frontend API calls now honor optional `VITE_API_BASE_URL`, while local Vite proxy behavior remains unchanged. Added configurable `FRONTEND_ORIGINS` support for a separately hosted API.
+- **Documentation:** Replaced `README.md` with GitHub-compatible badges, Mermaid architecture, capability/provenance tables, local setup, Vercel deployment steps, API inventory, validation commands, and an explicit explanation of ignored NetCDF data and serverless filesystem limits.
+- **Files changed:** `api/index.py`, `requirements.txt`, `vercel.json`, `.env.example`, `frontend/src/api/client.js`, `frontend/vite.config.js`, `backend/main.py`, `README.md`, `PHASE_LOG.md`.
+- **Deployment note:** The Vercel function exposes the API contract, but the ignored scientific cache still needs to be available to the backend. For production data, use a persistent FastAPI host and set `VITE_API_BASE_URL` in Vercel.
+- **Automated validation:** Frontend production build, Vercel entrypoint import, backend tests, Python compilation, and `git diff --check` pass.
+
 ## Region Drag-select and West-axis Slicing
 
 - **Status:** Complete.

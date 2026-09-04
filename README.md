@@ -1,37 +1,77 @@
-# OceanScope — India EEZ Ocean Intelligence
+# OceanScope
 
-OceanScope is a browser-based 3D ocean-data workspace built for **SIH Problem Statement 26067**. It brings Copernicus Marine forecast volumes, in-situ observations, model validation, scientist uploads, and standards-based GIS delivery into one traceable interface.
+<p align="center">
+  <strong>Browser-native 3D ocean intelligence for the India EEZ</strong><br>
+  Explore model fields, real observations, currents, bathymetry, and validation in one traceable workspace.
+</p>
 
-The application prioritizes scientific clarity over decorative realism: every rendered layer, current vector, profile, and isosurface is derived from real or user-supplied data. Glider and CTD demonstration records are explicitly labelled as sample data.
+<p align="center">
+  <a href="https://github.com/Tanishktewetia/incois-ocean-3d-viz/actions"><img src="https://img.shields.io/github/actions/workflow/status/Tanishktewetia/incois-ocean-3d-viz/ci.yml?branch=main&label=build" alt="Build status"></a>
+  <a href="https://github.com/Tanishktewetia/incois-ocean-3d-viz"><img src="https://img.shields.io/github/last-commit/Tanishktewetia/incois-ocean-3d-viz" alt="Last commit"></a>
+  <img src="https://img.shields.io/badge/frontend-React%2019%20%7C%20Vite-61dafb" alt="React and Vite">
+  <img src="https://img.shields.io/badge/backend-FastAPI-009688" alt="FastAPI">
+</p>
 
-## What is implemented
+OceanScope is the implementation for **SIH Problem Statement 26067**. It combines Copernicus Marine model volumes with Argo/BGC-Argo observations, model comparison, scientist uploads, and OGC delivery in a single interactive application.
 
-- Responsive 3D depth stack for temperature, salinity, and current magnitude
-- Real value ranges and units, linear/log color scaling, opacity, depth, time, and vertical-exaggeration controls
-- True marching-cubes isosurface extraction from the loaded scalar volume
-- Animated particles driven by Copernicus Marine `uo`/`vo` vectors
-- Core Argo and BGC-Argo overlays plus clearly labelled sample Glider/CTD records
-- Clickable observation profiles with model comparison and temperature RMSE
-- Validated CF-style NetCDF `thetao` upload workflow
-- OGC WMS 1.3.0 and WCS 2.0.1 endpoints
-- Dedicated mission, workflow, impact, and requirement-coverage page at `/about`
-- Responsive dark UI with keyboard focus states, control guidance, loading states, and reduced-motion support
+> **Data integrity first:** rendered scientific values come from real model, observation, bathymetry, satellite, or user-uploaded data. Glider and CTD demonstration points are labelled as sample data and are never presented as live observations.
 
-## Data provenance
+## Contents
 
-The bundled model subset comes from Copernicus Marine product `GLOBAL_ANALYSISFORECAST_PHY_001_024` for the India EEZ bounding box (68–90°E, 5–22°N). Model variables are `thetao`, `so`, `uo`, and `vo`. Real Argo and BGC-Argo records come from Argo GDAC.
+- [Highlights](#highlights)
+- [Architecture](#architecture)
+- [Data and attribution](#data-and-attribution)
+- [Run locally](#run-locally)
+- [Deploy to Vercel](#deploy-to-vercel)
+- [API](#api)
+- [Validation](#validation)
+- [Project guide](#project-guide)
 
-Large data files, uploads, and credentials are intentionally gitignored. The repository does not fabricate coastlines, bathymetry, or terrain. The scene mini-map reports only the geographic bounds of the loaded model data.
+## Highlights
 
-## Technology
+| Capability | What it provides |
+| --- | --- |
+| 3D ocean volume | Temperature, salinity, current magnitude, depth layers, time navigation, opacity, and vertical exaggeration |
+| Scientific figures | Layered volume, field relief, and longitude-depth section views |
+| Real currents | Animated particles driven by Copernicus `uo` and `vo` fields |
+| Instruments | Core Argo, BGC-Argo, and clearly labelled sample Glider/CTD profiles |
+| Validation | Click-to-compare model and observation profiles with temperature RMSE |
+| Analysis | Marching-cubes isosurfaces and temperature contour overlays |
+| Data Lab | Validated NetCDF and instrument uploads, with provenance shown in the UI |
+| Interoperability | WMS 1.3.0 and WCS 2.0.1 routes for GIS clients |
+| Context | Mission, impact, comparison, and requirement-coverage pages |
 
-- **Frontend:** React 19, Three.js, Chart.js, Vite
-- **Backend:** FastAPI, xarray, netCDF4, Pillow
-- **Formats and standards:** NetCDF/CF, WMS 1.3.0, WCS 2.0.1
+## Architecture
 
-## Local setup
+```mermaid
+flowchart LR
+  Browser[React + Three.js + Chart.js] --> API[FastAPI API]
+  API --> Processing[xarray and NetCDF processing]
+  Processing --> Model[Copernicus Marine subsets]
+  Processing --> Sensors[Argo and BGC-Argo GDAC]
+  API --> OGC[WMS / WCS]
+  Browser --> GIBS[NASA GIBS imagery]
+```
 
-Prerequisites: Python 3.11+ and Node.js 20+.
+The frontend is a Vite application in [`frontend/`](frontend/). The FastAPI application is in [`backend/main.py`](backend/main.py). The Vercel adapter in [`api/index.py`](api/index.py) exposes the same ASGI application as a serverless function.
+
+## Data and attribution
+
+- **Model:** Copernicus Marine `GLOBAL_ANALYSISFORECAST_PHY_001_024`, subset to 68–90°E and 5–22°N.
+- **Observations:** Argo GDAC, including BGC-Argo profiles.
+- **Bathymetry:** GEBCO gridded bathymetry.
+- **Land imagery:** NASA GIBS `MODIS_Terra_CorrectedReflectance_TrueColor`.
+- **Cyclones:** GDACS public event API.
+
+The cached NetCDF and Argo files are intentionally excluded from Git because of their size. A deployment needs access to the required files under `backend/data/`, or a separately hosted data-backed API configured through `VITE_API_BASE_URL`.
+
+## Run locally
+
+### Requirements
+
+- Python 3.11 or newer
+- Node.js 20 or newer
+- The demo NetCDF and Argo files described in [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
 ```powershell
 git clone https://github.com/Tanishktewetia/incois-ocean-3d-viz.git
@@ -42,58 +82,67 @@ backend/.venv/Scripts/python.exe -m pip install -r backend/requirements.txt
 npm install --prefix frontend
 ```
 
-Place the required Copernicus Marine NetCDF subsets and downloaded Argo indexes under `backend/data/`. These files are not committed because of their size. Copernicus credentials are used only for data acquisition and must not be stored in the repository.
-
-Run the API and frontend in separate terminals from the repository root:
+Start the API and frontend in separate terminals:
 
 ```powershell
 backend/.venv/Scripts/python.exe -m uvicorn backend.main:app --reload
-```
-
-```powershell
 npm run dev --prefix frontend
 ```
 
-Open:
+Open <http://localhost:5173>. Vite proxies `/health`, `/api`, `/wms`, and `/wcs` to the local API at port 8000.
 
-- Explorer: <http://localhost:5173/>
-- Mission and impact: <http://localhost:5173/about>
-- FastAPI documentation: <http://127.0.0.1:8000/docs>
+## Deploy to Vercel
 
-The Vite development server proxies API, WMS, and WCS requests to the backend.
+This repository includes [`vercel.json`](vercel.json), [`api/index.py`](api/index.py), and a root [`requirements.txt`](requirements.txt) for Vercel detection.
 
-## Using the workspace
+1. Import the GitHub repository into Vercel.
+2. Keep the project root at the repository root. Do not set `frontend` as the Vercel root directory.
+3. Add `VITE_API_BASE_URL` if the data-backed FastAPI API is hosted separately. Leave it empty only when the Vercel function can access the required datasets.
+4. Deploy. Vercel runs `npm ci --prefix frontend && npm run build --prefix frontend` and serves `frontend/dist`.
 
-1. Choose temperature, salinity, or current magnitude in the left control rail.
-2. Adjust color bounds, scaling, opacity, vertical exaggeration, depth, or model date.
-3. Rotate with left-drag, pan with middle-drag, and zoom with the wheel. The scene toolbar provides rotate, pan, zoom, and reset actions.
-4. Enable a true isosurface and move its threshold to inspect a data-derived 3D boundary.
-5. Enable surface currents to animate real `uo`/`vo` vectors.
-6. Click an instrument marker to inspect its profile and, where available, model RMSE.
-7. Use the Data Lab to validate and visualize a compatible NetCDF file.
+For a separately hosted API, set its `FRONTEND_ORIGINS` environment variable to the Vercel URL (for example, `https://your-project.vercel.app`). Multiple origins can be comma-separated.
 
-## NetCDF uploads
+### Important serverless limitation
 
-Uploads are limited to 100 MiB and must contain `thetao` with time, depth, latitude, and longitude coordinates. Uploaded data enables the temperature workflow; salinity and current overlays remain tied to the bundled model unless corresponding ingestion support is added.
+The Vercel function is a deployment adapter, not a data warehouse. The repository ignores the large NetCDF cache and upload storage, and serverless filesystems are ephemeral. For a production data deployment, host the FastAPI service with persistent data storage, set `VITE_API_BASE_URL` to its public HTTPS URL, and enable CORS for the Vercel domain. The frontend remains fully Vercel-hosted.
 
-## OGC services
+The upload workflow is best suited to local development or a backend with persistent storage. Never commit Copernicus credentials or `.env` files.
+
+Copy [`.env.example`](.env.example) to configure the frontend API base locally or in Vercel project settings.
+
+## API
 
 With the backend running:
 
-- WMS endpoint: `http://127.0.0.1:8000/wms`
-- WCS endpoint: `http://127.0.0.1:8000/wcs`
+| Route | Purpose |
+| --- | --- |
+| `GET /health` | Service health check |
+| `GET /api/layers` | Depth-layer grids and available dates |
+| `GET /api/slice` | Single-depth scalar grid |
+| `GET /api/currents` | Current vectors |
+| `GET /api/argo` | Argo profile catalog |
+| `GET /api/instruments` | Unified instrument catalog |
+| `POST /api/upload` | Validate a model NetCDF upload |
+| `GET /wms` | WMS capabilities and map responses |
+| `GET /wcs` | WCS coverage responses |
 
-Use `REQUEST=GetCapabilities` with the appropriate `SERVICE` and supported version to discover layers, coverages, formats, and query parameters.
+Interactive OpenAPI documentation is available at <http://127.0.0.1:8000/docs> during local development.
 
 ## Validation
 
 ```powershell
 backend/.venv/Scripts/python.exe -m unittest discover -s backend/tests -v
-backend/.venv/Scripts/python.exe -m compileall -q backend
+backend/.venv/Scripts/python.exe -m compileall -q backend api
 npm run build --prefix frontend
 git diff --check
 ```
 
-## Demonstration
+## Project guide
 
-See [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) for a focused 5–6 minute judge walkthrough.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): implementation contract, data sources, phase rules, and scientific scope.
+- [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md): five-to-six-minute judge walkthrough.
+- [`PHASE_LOG.md`](PHASE_LOG.md): completed phases, verification notes, and known deviations.
+
+## License and source data
+
+This repository contains application code and configuration. Consult each upstream provider's terms and attribution requirements before redistributing downloaded datasets or imagery.
