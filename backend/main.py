@@ -40,10 +40,11 @@ app.include_router(hazards_router)
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    s3_bucket = os.getenv("AWS_S3_BUCKET", "")
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     if not supabase_url or not service_role_key:
-        return {"status": "ok", "supabase": "not_configured"}
+        return {"status": "ok", "supabase": "not_configured", "s3": "configured" if s3_bucket else "not_configured"}
 
     try:
         response = requests.get(
@@ -53,8 +54,8 @@ def health() -> dict[str, str]:
         )
         response.raise_for_status()
     except requests.RequestException:
-        return {"status": "ok", "supabase": "unavailable"}
-    return {"status": "ok", "supabase": "ok"}
+        return {"status": "ok", "supabase": "unavailable", "s3": "configured" if s3_bucket else "not_configured"}
+    return {"status": "ok", "supabase": "ok", "s3": "configured" if s3_bucket else "not_configured"}
 
 
 @app.get("/api/health")

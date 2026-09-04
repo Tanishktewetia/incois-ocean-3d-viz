@@ -102,7 +102,7 @@ This repository includes [`vercel.json`](vercel.json), [`api/index.py`](api/inde
 
 For a separately hosted API, set its `FRONTEND_ORIGINS` environment variable to the Vercel URL (for example, `https://your-project.vercel.app`). Multiple origins can be comma-separated.
 
-The Render backend should also receive `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as environment variables. Keep the service-role key private and never commit it. The `/health` response reports whether the configured Supabase REST endpoint is reachable.
+The Render backend can load demo NetCDF files from a private S3 bucket by setting `AWS_S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY`. It falls back to Supabase Storage when S3 is not configured. Keep cloud credentials private and never commit them. Researcher uploads remain local-only and are not copied to either storage provider.
 
 ### Important serverless limitation
 

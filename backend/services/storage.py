@@ -8,10 +8,16 @@ import requests
 
 
 class StorageDataUnavailableError(RuntimeError):
-    """Raised when a configured Supabase Storage object cannot be cached."""
+    """Raised when a configured object-storage file cannot be cached."""
 
 
-def _configuration() -> tuple[str, str, str] | None:
+def _s3_configuration() -> tuple[str, str] | None:
+    bucket = os.getenv("AWS_S3_BUCKET", "")
+    region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "us-east-1"))
+    return (bucket, region) if bucket and region else None
+
+
+def _supabase_configuration() -> tuple[str, str, str] | None:
     url = os.getenv("SUPABASE_URL", "").rstrip("/")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     bucket = os.getenv("SUPABASE_STORAGE_BUCKET", "ocean-data")
@@ -25,6 +31,42 @@ def _headers(key: str) -> dict[str, str]:
 def _object_candidates(relative_path: str) -> tuple[str, ...]:
     normalized = relative_path.replace("\\", "/").lstrip("/")
     return normalized, f"data/{normalized}"
+
+
+def _s3_client(bucket: str, region: str) -> Any:
+    import boto3
+
+    return boto3.client("s3", region_name=region)
+
+
+def _ensure_s3_file(path: Path) -> bool:
+    configuration = _s3_configuration()
+    if configuration is None or path.is_file():
+        return path.is_file()
+    bucket, region = configuration
+    data_root = Path(__file__).resolve().parents[1] / "data"
+    relative_path = path.relative_to(data_root).as_posix()
+    client = _s3_client(bucket, region)
+    try:
+        object_key = next(
+            (key for candidate in _object_candidates(relative_path)
+             for key in (candidate,)
+             if client.list_objects_v2(Bucket=bucket, Prefix=key, MaxKeys=1).get("Contents")),
+            None,
+        )
+        if object_key is None:
+            return False
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = path.with_suffix(path.suffix + ".part")
+        client.download_file(bucket, object_key, str(temporary_path))
+        temporary_path.replace(path)
+        return True
+    except (OSError, ValueError):
+        path.with_suffix(path.suffix + ".part").unlink(missing_ok=True)
+        return False
+    except Exception:
+        path.with_suffix(path.suffix + ".part").unlink(missing_ok=True)
+        return False
 
 
 def _find_object(relative_path: str, url: str, key: str, bucket: str) -> str | None:
@@ -45,10 +87,12 @@ def _find_object(relative_path: str, url: str, key: str, bucket: str) -> str | N
 
 
 def ensure_storage_file(path: Path) -> bool:
-    """Download one missing backend/data file from private Supabase Storage."""
+    """Download one missing backend/data file from S3, then Supabase Storage."""
     if path.is_file():
         return True
-    configuration = _configuration()
+    if _ensure_s3_file(path):
+        return True
+    configuration = _supabase_configuration()
     if configuration is None:
         return False
 
@@ -84,7 +128,25 @@ def ensure_storage_directory(directory: Path) -> int:
         existing = list(directory.glob("*.nc"))
         if existing:
             return len(existing)
-    configuration = _configuration()
+    s3_configuration = _s3_configuration()
+    if s3_configuration is not None:
+        bucket, region = s3_configuration
+        data_root = Path(__file__).resolve().parents[1] / "data"
+        relative_directory = directory.relative_to(data_root).as_posix().rstrip("/") + "/"
+        try:
+            client = _s3_client(bucket, region)
+            response = client.list_objects_v2(Bucket=bucket, Prefix=relative_directory)
+            downloaded = 0
+            for item in response.get("Contents", []):
+                key = item.get("Key", "")
+                if key.endswith(".nc") and ensure_storage_file(directory / Path(key).name):
+                    downloaded += 1
+            if downloaded:
+                return downloaded
+        except Exception:
+            pass
+
+    configuration = _supabase_configuration()
     if configuration is None:
         return 0
 
